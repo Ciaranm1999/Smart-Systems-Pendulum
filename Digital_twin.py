@@ -156,14 +156,32 @@ class DigitalTwin:
     
     def get_theta_double_dot(self, theta, theta_dot):
         """
-        Lab 1: Model the angular acceleration (theta_double_dot) 
-        as a function of theta, theta_dot and the self.currentmotor_acceleration.  
-        You should include the following constants aswell: c_air, c_c, a_m, l and g. 
+        Computes the angular acceleration (theta_double_dot) for the pendulum
+        considering:
+        - Motor acceleration
+        - Gravity
+        - Coulomb friction
+        - Air friction
         """
 
-        theta_double_dot = -(1/self.l) * self.currentmotor_acceleration * np.cos(theta)*self.a_m - ((self.c_c * theta_dot)/self.m * self.l**2) - (self.g * np.sin(theta))/ self.l
-    
+        # Motor-driven acceleration term
+        motor_torque = -(1 / self.l) * self.currentmotor_acceleration * np.cos(theta) * self.a_m
+
+        # Gravity contribution
+        gravity_torque = -(self.g * np.sin(theta)) / self.l
+
+        # Coulomb friction
+        coulomb_friction = -((self.c_c * theta_dot) / (self.m * self.l**2))
+
+        # **New: Air friction term**
+        air_friction = - (self.c_air * theta_dot) / (self.m * self.l**2)
+
+        # Total angular acceleration
+        theta_double_dot = motor_torque + gravity_torque + coulomb_friction + air_friction
+
         return theta_double_dot
+
+    
     def step(self):
         # Get the predicted motor acceleration for the next step and the shift in x_pivot
         self.check_prediction_lists()
