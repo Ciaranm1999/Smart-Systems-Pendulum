@@ -20,13 +20,14 @@ class DigitalTwin:
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
-        self.delta_t = 0.005  # Example value, adjust as needed in seconds
+        self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
         # Model parameters
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
         self.l = 0.8   # Length of the pendulum (m)
         self.c_air = 0.5  # Air friction coefficient
         self.c_c = 1.1   # Coulomb friction coefficient
         self.a_m = 2000 # Motor acceleration force tranfer coefficient
+        self.m = 0.1 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
@@ -156,40 +157,17 @@ class DigitalTwin:
     def get_theta_double_dot(self, theta, theta_dot):
         """
         Lab 1: Model the angular acceleration (theta_double_dot) 
-        as a function of theta, theta_dot and the self.currentmotor_acceleration. 
+        as a function of theta, theta_dot and the self.currentmotor_acceleration.  
         You should include the following constants aswell: c_air, c_c, a_m, l and g. 
         """
-        #theta_double_dot = -(self.g/self.l) * np.sin(theta) + self.a_m * (self.currentmotor_acceleration/self.l) * np.cos(theta) - self.c_air * theta_dot - self.c_c * np.sign(theta_dot)
 
-        # Gravitational torque
-        torque_gravity = -self.g * np.sin(theta)
-
-        # Air friction torque
-        torque_air_friction = -self.c_air * theta_dot
-
-        # Coulomb friction torque
-        torque_coulomb_friction = -self.c_c * np.sign(theta_dot)
-
-        # Motor torque
-        torque_motor = -self.a_m * self.currentmotor_acceleration * np.cos(theta)
-
-        # Total torque
-        total_torque = torque_gravity + torque_air_friction + torque_coulomb_friction + torque_motor
-
-        # Angular acceleration
-        theta_double_dot = total_torque / self.l
-
+        theta_double_dot = -(1/self.l) * self.currentmotor_acceleration * np.cos(theta)*self.a_m - ((self.c_c * theta_dot)/self.m * self.l**2) - (self.g * np.sin(theta))/ self.l
+    
         return theta_double_dot
-
-        #return -(self.g/self.l) * np.sin(theta) - self.c_air * theta_dot - self.c_c * np.sign(theta_dot) + self.a_m * self.currentmotor_acceleration
-
     def step(self):
         # Get the predicted motor acceleration for the next step and the shift in x_pivot
         self.check_prediction_lists()
         #print(self.future_motor_accelerations)
-
-        self.x_pivot = max(-self.l*110, min(self.l*110, self.x_pivot))
-
         self.currentmotor_acceleration = self.future_motor_accelerations.pop(0)
         self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)/3
         # Update the system state based on the action and model dynamics
@@ -198,7 +176,6 @@ class DigitalTwin:
         self.theta_dot += self.theta_double_dot * self.delta_t
         self.time += self.delta_t
         self.steps += 1
-
 
         return self.theta, self.theta_dot, self.x_pivot
         
