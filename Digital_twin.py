@@ -20,7 +20,6 @@ class DigitalTwin:
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
-<<<<<<< Updated upstream
         self.delta_t = 0.005  # Example value, adjust as needed in seconds
         # Model parameters
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
@@ -28,16 +27,6 @@ class DigitalTwin:
         self.c_air = 0.5  # Air friction coefficient
         self.c_c = 1.1   # Coulomb friction coefficient
         self.a_m = 2000 # Motor acceleration force tranfer coefficient
-=======
-        self.delta_t = 0.004  # Example value, adjust as needed in seconds 19.42879347
-        # Model parameters
-        self.g = 9.81  # Acceleration due to gravity (m/s^2)
-        self.l = 0.8   # Length of the pendulum (m)
-        self.c_air = 0.1  # Air friction coefficient
-        self.c_c = 0.1   # Coulomb friction coefficient
-        self.a_m = 1000 # Motor acceleration force tranfer coefficient
-        self.m = 0.1 # Mass of the pendulum
->>>>>>> Stashed changes
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
@@ -188,13 +177,10 @@ class DigitalTwin:
         total_torque = torque_gravity + torque_air_friction + torque_coulomb_friction + torque_motor
 
         # Angular acceleration
-        theta_double_dot = total_torque / self.l
+        #theta_double_dot = total_torque / self.l
 
-<<<<<<< Updated upstream
-=======
         theta_double_dot = -(1/self.l) * self.currentmotor_acceleration * np.cos(theta)*self.a_m - (self.c_c * theta_dot) - ((self.g * np.sin(theta))/self.l) - (self.c_air * theta_dot)
     
->>>>>>> Stashed changes
         return theta_double_dot
 
         #return -(self.g/self.l) * np.sin(theta) - self.c_air * theta_dot - self.c_c * np.sign(theta_dot) + self.a_m * self.currentmotor_acceleration
