@@ -25,9 +25,9 @@ class DigitalTwin:
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
         self.l = 0.8   # Length of the pendulum (m)
         self.c_air = 0.5  # Air friction coefficient
-        self.c_c = 1.1   # Coulomb friction coefficient
+        self.c_c = 0.8   # Coulomb friction coefficient
         self.a_m = 2000 # Motor acceleration force tranfer coefficient
-        self.m = 0.1 # Mass of the pendulum
+        self.m = 10 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
