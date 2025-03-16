@@ -25,9 +25,9 @@ class DigitalTwin:
         # Model parameters
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
         self.l = 0.4   # Length of the pendulum (m)
-        self.c_air = 0.05  # Air friction coefficient
-        self.c_c = 0.02   # Coulomb friction coefficient
-        self.a_m = 2000 # Motor acceleration force tranfer coefficient
+        self.c_air = 0.01  # Air friction coefficient
+        self.c_c = 0.1   # Coulomb friction coefficient
+        self.a_m = 1000 # Motor acceleration force tranfer coefficient
         self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
@@ -167,19 +167,19 @@ class DigitalTwin:
 
         # Motor-driven acceleration term
         motor_torque = -(1 / self.l) * self.currentmotor_acceleration * np.cos(theta) * self.a_m
-
+        
         # Gravity contribution
         gravity_torque = -(self.g * np.sin(theta)) / self.l
-
+        
         # Coulomb friction
-        coulomb_friction = -((self.c_c * theta_dot) / (self.m * self.l**2))
+        coulomb_friction = -((self.c_c * np.sign(theta_dot)) / (self.m * self.l**2))
 
         # **New: Air friction term**
         air_friction = - (self.c_air * theta_dot) / (self.m * self.l**2)
-
+        
         # Total angular acceleration
         theta_double_dot = motor_torque + gravity_torque + coulomb_friction + air_friction
-
+        
         return theta_double_dot
 
     
@@ -221,5 +221,3 @@ class DigitalTwin:
             self.future_motor_accelerations = [0]
         if len(self.future_motor_positions) == 0:
             self.future_motor_positions = [0]
-
-
