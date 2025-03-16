@@ -12,6 +12,7 @@ if __name__=='__main__':
             
             theta, theta_dot, x_pivot = digital_twin.step()
             # print(theta_dot)
+            #print(theta_dot)
             digital_twin.render(theta, x_pivot)
             time.sleep(digital_twin.delta_t)
             

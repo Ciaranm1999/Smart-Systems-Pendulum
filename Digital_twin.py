@@ -1,5 +1,6 @@
 import pygame
 import scipy.integrate
+import scipy.integrate
 import serial
 import numpy as np
 import csv
@@ -22,12 +23,18 @@ class DigitalTwin:
         self.theta_double_dot = 0.
         self.x_pivot = 0
         self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
+        self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
         # Model parameters
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
         self.l = 0.4   # Length of the pendulum (m)
         self.c_air = 0.01  # Air friction coefficient
         self.c_c = 0.1   # Coulomb friction coefficient
         self.a_m = 1000 # Motor acceleration force tranfer coefficient
+        self.m = 0.3 # Mass of the pendulum
+        self.l = 0.4   # Length of the pendulum (m)
+        self.c_air = 0.05  # Air friction coefficient
+        self.c_c = 0.2   # Coulomb friction coefficient
+        self.a_m = 2000 # Motor acceleration force tranfer coefficient
         self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
@@ -153,10 +160,18 @@ class DigitalTwin:
         
         _velocity = it.cumulative_trapezoid(self.future_motor_accelerations,initial=0)
         self.future_motor_positions = list(it.cumulative_trapezoid(_velocity,initial=0))
+        _velocity = it.cumulative_trapezoid(self.future_motor_accelerations,initial=0)
+        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity,initial=0))
     
     
     def get_theta_double_dot(self, theta, theta_dot):
         """
+        Computes the angular acceleration (theta_double_dot) for the pendulum
+        considering:
+        - Motor acceleration
+        - Gravity
+        - Coulomb friction
+        - Air friction
         Computes the angular acceleration (theta_double_dot) for the pendulum
         considering:
         - Motor acceleration
@@ -174,12 +189,14 @@ class DigitalTwin:
         # Coulomb friction
         coulomb_friction = -((self.c_c * np.sign(theta_dot)) / (self.m * self.l**2))
 
-        # **New: Air friction term**
-        air_friction = - (self.c_air * theta_dot) / (self.m * self.l**2)
-        
-        # Total angular acceleration
-        theta_double_dot = motor_torque + gravity_torque + coulomb_friction + air_friction
-        
+        # Total torque
+        total_torque = torque_gravity + torque_air_friction + torque_coulomb_friction + torque_motor
+
+        # Angular acceleration
+        #theta_double_dot = total_torque / self.l
+
+        theta_double_dot = -(1/self.l) * self.currentmotor_acceleration * np.cos(theta)*self.a_m - (self.c_c * theta_dot) - ((self.g * np.sin(theta))/self.l) - (self.c_air * theta_dot)
+    
         return theta_double_dot
 
     
