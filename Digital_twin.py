@@ -1,4 +1,5 @@
 import pygame
+import scipy.integrate
 import serial
 import numpy as np
 import csv
@@ -23,11 +24,11 @@ class DigitalTwin:
         self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
         # Model parameters
         self.g = 9.81  # Acceleration due to gravity (m/s^2)
-        self.l = 0.8   # Length of the pendulum (m)
-        self.c_air = 0.5  # Air friction coefficient
-        self.c_c = 0.8   # Coulomb friction coefficient
+        self.l = 0.4   # Length of the pendulum (m)
+        self.c_air = 0.05  # Air friction coefficient
+        self.c_c = 0.02   # Coulomb friction coefficient
         self.a_m = 2000 # Motor acceleration force tranfer coefficient
-        self.m = 10 # Mass of the pendulum
+        self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
@@ -150,8 +151,8 @@ class DigitalTwin:
             
             self.future_motor_accelerations.append(c)
         
-        _velocity = it.cumtrapz(self.future_motor_accelerations,initial=0)
-        self.future_motor_positions = list(it.cumtrapz(_velocity,initial=0))
+        _velocity = it.cumulative_trapezoid(self.future_motor_accelerations,initial=0)
+        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity,initial=0))
     
     
     def get_theta_double_dot(self, theta, theta_dot):
