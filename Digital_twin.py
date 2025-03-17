@@ -17,7 +17,7 @@ class DigitalTwin:
         self.device_connected = False
         # State configuration parameters
         self.steps = 0
-        self.theta = 0.#np.pi-0.01
+        self.theta = np.pi#np.pi-0.01
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
@@ -192,11 +192,15 @@ class DigitalTwin:
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
         self.theta += self.theta_dot * self.delta_t
+        if self.theta > 2 * np.pi:
+            self.theta -= 2 *np.pi
+        elif self.theta < 0:
+            self.theta += 2 * np.pi
         self.theta_dot += self.theta_double_dot * self.delta_t
         self.time += self.delta_t
         self.steps += 1
 
-        return self.theta, self.theta_dot, self.x_pivot
+        return self.theta, self.theta_dot, self.theta_double_dot, self.x_pivot
         
 
     def draw_line_and_circles(self, colour, start_pos, end_pos, line_width=5, circle_radius=9):
