@@ -26,13 +26,13 @@ history_buffer = []
 replay_buffer = []
 
 render = False
-max_run_time = 60.0 # seconds
+max_run_time = 30.0 # seconds
 translated_action = ['left', 0]
 action_index = 0 
 agent = PendulumRlAgent()
 
 epoch = 0
-epochs_max = 1000
+epochs_max = 10000
 if __name__=='__main__':
     while epoch < epochs_max:
         epoch += 1
@@ -43,22 +43,23 @@ if __name__=='__main__':
         state_rewards = 0.
 
         previous_state = []
-        while running and run_time < max_run_time and state_rewards > -3:
+        while running and run_time < max_run_time:
             run_time += digital_twin.delta_t
             time_in_current_state += digital_twin.delta_t
             theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step()
-            state_rewards += agent.reward_calculation(x_pivot, theta)
-
+            theta_corrected = theta%(2*np.pi)
+            state_rewards += agent.reward_calculation(x_pivot, theta_corrected)
+            
             # the history buffer will never get really big, unless we run for hours.
-            history_buffer.append([run_time, theta, theta_dot, theta_double_dot, x_pivot])
+            history_buffer.append([run_time, theta_corrected, theta_dot, theta_double_dot, x_pivot])
             
             if render:
-                digital_twin.render(theta, x_pivot)
+                digital_twin.render(theta_corrected, x_pivot)
                 # time.sleep(digital_twin.delta_t)
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
-                current_state = [theta, theta_dot, theta_double_dot, x_pivot]
+                current_state = [theta_corrected, theta_dot, theta_double_dot, x_pivot]
                 if len(previous_state) == 0:
                      previous_state = current_state
                 buffer_entry = previous_state + [action_index, state_rewards] + current_state
@@ -82,6 +83,8 @@ if __name__=='__main__':
                     #         print("System restarted")
                     if event.key == pygame.K_ESCAPE:
                         running = False # Quit the simulation
+                    elif event.key == pygame.K_l:
+                        render = not render
 
         with open(f'./recordings/recording_{epoch}.csv', mode='a', newline='') as file:
             writer = csv.writer(file)
@@ -93,7 +96,7 @@ if __name__=='__main__':
             writer.writerows(replay_buffer)
             replay_buffer = []
         
-        agent.train()
+        agent.train_faster()
         print(f"Epoch {epoch} completed")
 
     pygame.quit()
