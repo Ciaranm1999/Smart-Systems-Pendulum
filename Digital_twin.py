@@ -134,26 +134,42 @@ class DigitalTwin:
             direction = 1
 
         """
-        Lab 1 & 3 bonus: Model the expected acceleration response of the motor.  
+        Lab 1 & 3 bonus: Model the expected acceleration response of the motor.
         """
         a_m_1 = 0.05
         a_m_2 = 0.05
-        t1 = duration/4
-        t2_d = duration/4
+        t1 = duration / 4
+        t2_d = duration / 4
         t2 = duration - t2_d
-        for t in np.arange(0.0, duration+self.delta_t, self.delta_t):
+        self.future_motor_accelerations = [] #Clear the array
+        for t in np.arange(0.0, duration + self.delta_t, self.delta_t):
             if t <= t1:
-                c = -4*direction*a_m_1/(t1*t1) * t * (t-t1)
+                c = -4 * direction * a_m_1 / (t1 * t1) * t * (t - t1)
             elif t < t2 and t > t1:
-                c = 0 
+                c = 0
             elif t >= t2:
-                c = 4*direction*a_m_2/(t2_d*t2_d) * (t-t2) * (t-duration)
-            
+                c = 4 * direction * a_m_2 / (t2_d * t2_d) * (t - t2) * (t - duration)
+
             self.future_motor_accelerations.append(c)
+
+        _velocity = it.cumulative_trapezoid(self.future_motor_accelerations, initial=0)
+        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0))
+
+        # Apply position constraints and adjust acceleration
+        for i, relative_position in enumerate(self.future_motor_positions):
+            absolute_position = relative_position + self.x_pivot
+            if absolute_position > 100:
+                self.future_motor_positions[i] = 100 - self.x_pivot
+                if i > 0:
+                    self.future_motor_accelerations[i] = 0
+                    _velocity[i] = 0
+            elif absolute_position < -100:
+                self.future_motor_positions[i] = -100 - self.x_pivot
+                if i > 0:
+                    self.future_motor_accelerations[i] = 0
+                    _velocity[i] = 0
+        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0)) #recalculate positions after velocity correction
         
-        _velocity = it.cumulative_trapezoid(self.future_motor_accelerations,initial=0)
-        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity,initial=0))
-    
     
     def get_theta_double_dot(self, theta, theta_dot):
         """
