@@ -14,7 +14,7 @@ class hyperparameters:
     TAU = 0.001
     Q_MAX_VALUE = 40
     Q_MIN_VALUE = -40
-    REWARDS_SCALING = -10
+    REWARDS_SCALING = 10
     # Lab 1 
     MAX_RUN_TIME = 15.0 # seconds
     SAMPLE_TIME = 0.2 # seconds
