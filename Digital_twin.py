@@ -156,18 +156,18 @@ class DigitalTwin:
         self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0))
 
         # Apply position constraints and adjust acceleration
-        for i, relative_position in enumerate(self.future_motor_positions):
-            absolute_position = relative_position + self.x_pivot
-            if absolute_position > 100:
-                self.future_motor_positions[i] = 100 - self.x_pivot
-                if i > 0:
-                    self.future_motor_accelerations[i] = 0
-                    _velocity[i] = 0
-            elif absolute_position < -100:
-                self.future_motor_positions[i] = -100 - self.x_pivot
-                if i > 0:
-                    self.future_motor_accelerations[i] = 0
-                    _velocity[i] = 0
+        # for i, relative_position in enumerate(self.future_motor_positions):
+        #     absolute_position = relative_position + self.x_pivot
+        #     if absolute_position > 100:
+        #         self.future_motor_positions[i] = 100 - self.x_pivot
+        #         if i > 0:
+        #             self.future_motor_accelerations[i] = 0
+        #             _velocity[i] = 0
+        #     elif absolute_position < -100:
+        #         self.future_motor_positions[i] = -100 - self.x_pivot
+        #         if i > 0:
+        #             self.future_motor_accelerations[i] = 0
+        #             _velocity[i] = 0
         self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0)) #recalculate positions after velocity correction
         
     

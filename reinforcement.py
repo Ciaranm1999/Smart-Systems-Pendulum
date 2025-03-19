@@ -2,18 +2,21 @@ import torch
 from torch import nn
 import numpy as np
 import random
+from hyperparameters import hyperparameters
+
+hp = hyperparameters()
 
 class NeuralNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
-        mid_dim = 64
+        mid_dim = hp.HIDDEN_LAYER_NODES
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(4, mid_dim),
             nn.ReLU(),
             nn.Linear(mid_dim, mid_dim),
             nn.ReLU(),
-            nn.Linear(mid_dim, 9),
+            nn.Linear(mid_dim, 8),
         )
 
     def forward(self, x):
@@ -40,15 +43,15 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class PendulumRlAgent:
-    def __init__(self, capacity=13000):
+    def __init__(self, capacity=10_500_000):
         self.device = torch.device('cuda')
         self.model = NeuralNetwork().to(self.device)
         self.target_model = NeuralNetwork().to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hp.LEARNING_RATE)
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3
         # self.loss_fn = nn.MSELoss()
-        self.actions = [('left', 0), 
+        self.actions = [
                         ('left', 50), 
                         ('left', 100), 
                         ('left', 150), 
@@ -59,27 +62,10 @@ class PendulumRlAgent:
                         ('right', 200)]
         self.replay_buffer = ReplayBuffer(capacity)
 
-        self.epsilon = 0.5
-        self.epsilon_decay = 0.995
-        self.epsilon_min = 0.01
+        self.epsilon = hp.EPSILON_START
+        self.epsilon_decay = hp.EPSILON_DECAY
+        self.epsilon_min = hp.EPSILON_MIN
 
-        # self.data = [self.position, self.velocity, self.angle, self.angle_velocity, self.angle_acceleration]
-        # self.x_data = torch.tensor(self.data).float().to(self.device)
-        # self.logits = self.model(self.x_data)
-        # self.pred_probab = nn.Softmax()(self.logits)
-        # self.y_pred = self.pred_probab.argmax()
-        # self.loss = self.loss_fn(self.logits, self.x_data)
-        # self.optimizer.zero_grad()
-        # self.loss.backward()
-        # self.optimizer.step()
-        # print(f"Predicted class: {self.y_pred}")
-        # print(self.loss)
-        # print(self.model)
-    
-            # temperature = 0.99  # Lower temperature increases confidence in the highest probabilities
-        # adjusted_probab = torch.pow(pred_probab, 1 / temperature)
-        # adjusted_probab /= adjusted_probab.sum()  # Re-normalize probabilities
-        # y_pred = torch.multinomial(adjusted_probab, 1).item()
     def predict(self, angle, angle_velocity, angle_acceleration, position):
         normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration, position)
         data = [normalized_data[key] for key in ['position', 'angle_velocity', 'angle_acceleration', 'angle']]
@@ -88,26 +74,12 @@ class PendulumRlAgent:
         pred_probab = nn.Softmax(dim=0)(logits)
         top_action = pred_probab.argmax().item()  # Action with highest probability
 
-        # if random.random() < 0.8:  # 80% of the time, pick the highest probability action
-        #     y_pred = top_action
-        # else:  # 20% of the time, sample from the probability distribution
-        #     y_pred = torch.multinomial(pred_probab, 1).item()
-        
         if random.random() < self.epsilon:  # Explore
             y_pred = random.randint(0, len(self.actions) - 1)
         else:  # Exploit
             y_pred = top_action
         
         return self.actions[y_pred], y_pred
-    
-    
-        self.loss = self.loss_fn(self.logits, self.x_data)
-        self.optimizer.zero_grad()
-        self.loss.backward()
-        self.optimizer.step()
-        print(f"Predicted class: {self.y_pred}")
-        print(self.loss)
-        print(self.model)
     
     def normalise_input(self, angle=None, angle_velocity=None, angle_acceleration=None, position=None, reward=None):
         """
@@ -134,7 +106,7 @@ class PendulumRlAgent:
             "angle_velocity": (-15.0, 15.0),
             "angle_acceleration": (-20.0, 20.0),
             "position": (-100.0, 100.0),
-            "reward": (0.0, 40.0),
+            "reward": (-80.0, 40.0),
         }
 
         input_values = {
@@ -156,9 +128,9 @@ class PendulumRlAgent:
 
     def reward_calculation(self, position, angle):
         # Reward function
-        angle_scale = 1
+        angle_scale = 4
         # position_scale = 0.1
-
+        
         # Normalize the input values
         # normalized_data = self.normalise_input(angle=angle, position=position)
         normalized_data = self.normalise_input(angle=angle, position=position)
@@ -167,21 +139,23 @@ class PendulumRlAgent:
 
         # we want around 0.5 and 0.0 for angle and position respectively        
         angle_desired = 0.5
-        angle_reward = 0.4-(abs(angle_normalized - angle_desired) * angle_scale)
+        angle_reward = 1-(abs(angle_normalized - angle_desired) * angle_scale)
 
+        position_reward = 0
+        if abs(position) > 150:
+            position_reward = -1
         # position_desired = 0.5
         # position_reward = -(abs(position_normalized - position_desired) * position_scale)
 
-        reward = angle_reward# + position_reward
+        reward = angle_reward + position_reward
     
         return reward
     
     def train(self):
-        BATCH_SIZE = 128
-        GAMMA = 0.9
+        BATCH_SIZE = hp.BATCH_SIZE
+        GAMMA = hp.GAMMA
         STATE_DIM = 4
-        REWARD_MULTIPLIER = 1
-        TAU = 0.005 
+        TAU = hp.TAU 
 
         if len(self.replay_buffer) < BATCH_SIZE:
             print(f"Replay buffer has {len(self.replay_buffer)} samples, waiting for {BATCH_SIZE}")
@@ -194,7 +168,7 @@ class PendulumRlAgent:
         for sample in samples:
             state = sample[:STATE_DIM]
             action = sample[STATE_DIM]
-            reward = sample[STATE_DIM+1] * REWARD_MULTIPLIER
+            reward = sample[STATE_DIM+1]
             next_state = sample[STATE_DIM+2:]
             
             state = torch.tensor(state).float().to(self.device)
@@ -222,39 +196,35 @@ class PendulumRlAgent:
         for target_param, param in zip(self.target_model.parameters(), self.model.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
 
-    def train_faster(self):
-        BATCH_SIZE = 64
-        GAMMA = 0.9
+    def train_faster(self, max_reward=0, print_output=False):
+        BATCH_SIZE = hp.BATCH_SIZE
+        GAMMA = hp.GAMMA
         STATE_DIM = 4
-        REWARD_MULTIPLIER = 1
-        TAU = 0.001
-
+        TAU = hp.TAU
+        REWARDS_SCALING = hp.REWARDS_SCALING
         if len(self.replay_buffer) < BATCH_SIZE:
-            print(f"Replay buffer has {len(self.replay_buffer)} samples, waiting for {BATCH_SIZE}")
-            return
+            if print_output:
+                print(f"Replay buffer has {len(self.replay_buffer)} samples, waiting for {BATCH_SIZE}")
+            return max_reward
 
         samples = self.replay_buffer.sample(BATCH_SIZE)
 
         # Extract data from samples
         states = torch.tensor([sample[:STATE_DIM] for sample in samples]).float().to(self.device)
         actions = torch.tensor([sample[STATE_DIM] for sample in samples]).long().to(self.device).unsqueeze(1)
-        rewards = torch.tensor([sample[STATE_DIM + 1] * REWARD_MULTIPLIER for sample in samples]).float().to(self.device)
+        rewards = torch.tensor([sample[STATE_DIM + 1] for sample in samples]).float().to(self.device)
         next_states = torch.tensor([sample[STATE_DIM + 2:] for sample in samples]).float().to(self.device)
 
         # Normalize rewards
         rewards = self.normalise_input(reward=rewards)['reward']
-        # Clip rewards to be within a specified range
-        # reward_min, reward_max = -1.0, 1.0
-        # rewards = torch.clamp(rewards, reward_min, reward_max)
-        # rewards -= 0.8
-
+        rewards *= REWARDS_SCALING
         # Calculate Q-values
         q_values = self.model(states).gather(1, actions)
         
         # Calculate target Q-values
         next_q_values = self.target_model(next_states).max(1)[0].unsqueeze(1)
         target_q_values = rewards.unsqueeze(1) + GAMMA * next_q_values
-
+        target_q_values = torch.clamp(target_q_values, hp.Q_MIN_VALUE, hp.Q_MAX_VALUE)
         # Calculate loss
         # loss = nn.MSELoss()(q_values, target_q_values)
         loss = nn.SmoothL1Loss()(q_values, target_q_values)
@@ -266,13 +236,18 @@ class PendulumRlAgent:
 
         # Calculate mean reward
         mean_reward = torch.mean(rewards).item()
-        print(f"Loss: {loss.item()}\t Reward: {mean_reward}'t epsilon: {self.epsilon}")
+        biggest_reward = torch.max(rewards).item()
+        if biggest_reward > max_reward:
+            max_reward = biggest_reward
+        if print_output:
+            print(f"Loss: {loss.item()}\t Reward: {mean_reward}\tepsilon: {self.epsilon}\tMax reward: {max_reward}")
 
         # Soft update of target model
         for target_param, param in zip(self.target_model.parameters(), self.model.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
         
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+        return max_reward
 #%%
 # position = 1.0
 # velocity = 0.5

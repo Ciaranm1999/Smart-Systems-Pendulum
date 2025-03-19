@@ -4,8 +4,9 @@ from Digital_twin import DigitalTwin
 import csv
 from reinforcement import PendulumRlAgent
 import numpy as np
+from hyperparameters import hyperparameters
 # Before starting run pip install -r requirements.txt
-
+hp = hyperparameters()
 # Clear the contents of the recording.csv file
 with open('./recordings/recording.csv', mode='w', newline='') as file:
     file.truncate()
@@ -20,20 +21,26 @@ with open('./replays/replay.csv', mode='w', newline='') as file:
     writer.writerow(names)
 
 digital_twin = DigitalTwin()
-sample_time = 0.2 # seconds
+sample_time = hp.SAMPLE_TIME
 
 history_buffer = []
 replay_buffer = []
 
-render = False
-max_run_time = 30.0 # seconds
+render = hp.RENDER
+print_output = hp.PRINT_OUTPUT
+
+max_run_time = hp.MAX_RUN_TIME
 translated_action = ['left', 0]
 action_index = 0 
 agent = PendulumRlAgent()
 
 epoch = 0
-epochs_max = 10000
+epochs_max = hp.EPOCHS_MAX
+max_reward = 0
 if __name__=='__main__':
+    print("press 'l' to toggle rendering on/off")
+    print("press 'p' to toggle print output on/off")
+    print("press 'esc' to quit")
     while epoch < epochs_max:
         epoch += 1
         digital_twin = DigitalTwin()
@@ -51,7 +58,7 @@ if __name__=='__main__':
             state_rewards += agent.reward_calculation(x_pivot, theta_corrected)
             
             # the history buffer will never get really big, unless we run for hours.
-            history_buffer.append([run_time, theta_corrected, theta_dot, theta_double_dot, x_pivot])
+            # history_buffer.append([run_time, theta_corrected, theta_dot, theta_double_dot, x_pivot])
             
             if render:
                 digital_twin.render(theta_corrected, x_pivot)
@@ -64,7 +71,7 @@ if __name__=='__main__':
                      previous_state = current_state
                 buffer_entry = previous_state + [action_index, state_rewards] + current_state
                 agent.replay_buffer.push(*buffer_entry)
-                replay_buffer.append([run_time] +buffer_entry)
+                # replay_buffer.append([run_time] +buffer_entry)
                 # code to call the RL agent to get the action
                 translated_action, action_index = agent.predict(*current_state)
                 digital_twin.perform_action(translated_action[0], translated_action[1])
@@ -85,19 +92,25 @@ if __name__=='__main__':
                         running = False # Quit the simulation
                     elif event.key == pygame.K_l:
                         render = not render
+                    elif event.key == pygame.K_p:
+                        print_output = not print_output
+        # with open(f'./recordings/recording_{epoch}.csv', mode='a', newline='') as file:
+        #     writer = csv.writer(file)
+        #     writer.writerows(history_buffer)
+        #     history_buffer = []
 
-        with open(f'./recordings/recording_{epoch}.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(history_buffer)
-            history_buffer = []
+        # with open(f'./replays/replay_{epoch}.csv', mode='a', newline='') as file:
+        #     writer = csv.writer(file)
+        #     writer.writerows(replay_buffer)
+        #     replay_buffer = []
+        temp_print = print_output
+        if temp_print ==  False:
+            if epoch % 500 == 0:
+                temp_print = True
 
-        with open(f'./replays/replay_{epoch}.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(replay_buffer)
-            replay_buffer = []
-        
-        agent.train_faster()
-        print(f"Epoch {epoch} completed")
+        max_reward = agent.train_faster(max_reward, temp_print)
+        if temp_print:
+            print(f"Epoch {epoch} completed")
 
     pygame.quit()
     
