@@ -66,7 +66,7 @@ if __name__=='__main__':
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
-                current_state = [theta_corrected, theta_dot, theta_double_dot, x_pivot]
+                current_state = [theta_corrected, theta_dot, theta_double_dot]
                 if len(previous_state) == 0:
                      previous_state = current_state
                 buffer_entry = previous_state + [action_index, state_rewards] + current_state
@@ -75,6 +75,7 @@ if __name__=='__main__':
                 # code to call the RL agent to get the action
                 translated_action, action_index = agent.predict(*current_state)
                 digital_twin.perform_action(translated_action[0], translated_action[1])
+                sample_time = translated_action[1]/1000
                 previous_state = current_state
                 state_rewards = 0.
 
@@ -105,7 +106,7 @@ if __name__=='__main__':
         #     replay_buffer = []
         temp_print = print_output
         if temp_print ==  False:
-            if epoch % 500 == 0:
+            if epoch % 100 == 0:
                 temp_print = True
 
         max_reward = agent.train_faster(max_reward, temp_print)

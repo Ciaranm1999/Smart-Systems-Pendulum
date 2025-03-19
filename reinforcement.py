@@ -12,11 +12,11 @@ class NeuralNetwork(nn.Module):
         self.flatten = nn.Flatten()
         mid_dim = hp.HIDDEN_LAYER_NODES
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(4, mid_dim),
+            nn.Linear(3, mid_dim),
             nn.ReLU(),
             nn.Linear(mid_dim, mid_dim),
             nn.ReLU(),
-            nn.Linear(mid_dim, 8),
+            nn.Linear(mid_dim, 9),
         )
 
     def forward(self, x):
@@ -51,7 +51,7 @@ class PendulumRlAgent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hp.LEARNING_RATE)
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3
         # self.loss_fn = nn.MSELoss()
-        self.actions = [
+        self.actions = [('left', 0),	
                         ('left', 50), 
                         ('left', 100), 
                         ('left', 150), 
@@ -66,9 +66,12 @@ class PendulumRlAgent:
         self.epsilon_decay = hp.EPSILON_DECAY
         self.epsilon_min = hp.EPSILON_MIN
 
-    def predict(self, angle, angle_velocity, angle_acceleration, position):
-        normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration, position)
-        data = [normalized_data[key] for key in ['position', 'angle_velocity', 'angle_acceleration', 'angle']]
+        self.hard_update_counter = 0
+        self.hard_update_frequency = 1000
+
+    def predict(self, angle, angle_velocity, angle_acceleration):
+        normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration)
+        data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle']]
         x_data = torch.tensor(data).float().to(self.device)
         logits = self.model(x_data)
         pred_probab = nn.Softmax(dim=0)(logits)
@@ -141,13 +144,16 @@ class PendulumRlAgent:
         angle_desired = 0.5
         angle_reward = 1-(abs(angle_normalized - angle_desired) * angle_scale)
 
-        position_reward = 0
-        if abs(position) > 150:
-            position_reward = -1
+        # position_reward = 0.5
+        # if abs(position) > 150:
+        #     position_reward = -1
+        # else:
+        #     position_reward = (150 - abs(position)) / 150
         # position_desired = 0.5
         # position_reward = -(abs(position_normalized - position_desired) * position_scale)
 
-        reward = angle_reward + position_reward
+        # reward = angle_reward + position_reward
+        reward = angle_reward
     
         return reward
     
@@ -199,7 +205,7 @@ class PendulumRlAgent:
     def train_faster(self, max_reward=0, print_output=False):
         BATCH_SIZE = hp.BATCH_SIZE
         GAMMA = hp.GAMMA
-        STATE_DIM = 4
+        STATE_DIM = 3
         TAU = hp.TAU
         REWARDS_SCALING = hp.REWARDS_SCALING
         if len(self.replay_buffer) < BATCH_SIZE:
@@ -216,7 +222,7 @@ class PendulumRlAgent:
         next_states = torch.tensor([sample[STATE_DIM + 2:] for sample in samples]).float().to(self.device)
 
         # Normalize rewards
-        rewards = self.normalise_input(reward=rewards)['reward']
+        # rewards = self.normalise_input(reward=rewards)['reward']
         rewards *= REWARDS_SCALING
         # Calculate Q-values
         q_values = self.model(states).gather(1, actions)
@@ -246,23 +252,12 @@ class PendulumRlAgent:
         for target_param, param in zip(self.target_model.parameters(), self.model.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
         
+        # Hard update of target model
+        self.hard_update_counter += 1
+        if self.hard_update_counter % self.hard_update_frequency == 0:
+            self.target_model.load_state_dict(self.model.state_dict())  # Hard update
+            self.hard_update_counter = 0  # Reset the counter
+
+
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
         return max_reward
-#%%
-# position = 1.0
-# velocity = 0.5
-# angle = 0.1
-# angle_velocity = 0.05
-# angle_acceleration = 0.01
-
-# data = [position, velocity, angle, angle_velocity, angle_acceleration]
-# x_data = torch.tensor(data).float().to(device)
-# # print(torch.flatten(x_data))
-# logits = model(x_data)
-# pred_probab = nn.Softmax()(logits)
-# y_pred = pred_probab.argmax()
-# nn.functional.mse_loss(logits, x_data)
-# print(f"Predicted class: {y_pred}")
-# %%
-
-
