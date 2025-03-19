@@ -45,7 +45,7 @@ class PendulumRlAgent:
         self.model = NeuralNetwork().to(self.device)
         self.target_model = NeuralNetwork().to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3
         # self.loss_fn = nn.MSELoss()
         self.actions = [('left', 0), 
@@ -59,7 +59,7 @@ class PendulumRlAgent:
                         ('right', 200)]
         self.replay_buffer = ReplayBuffer(capacity)
 
-        self.epsilon = 1.0
+        self.epsilon = 0.5
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.01
 
@@ -134,7 +134,7 @@ class PendulumRlAgent:
             "angle_velocity": (-15.0, 15.0),
             "angle_acceleration": (-20.0, 20.0),
             "position": (-100.0, 100.0),
-            "reward": (-35.0, 1.0),
+            "reward": (0.0, 40.0),
         }
 
         input_values = {
@@ -156,22 +156,23 @@ class PendulumRlAgent:
 
     def reward_calculation(self, position, angle):
         # Reward function
-        angle_scale = 1.0
-        position_scale = 0.1
+        angle_scale = 1
+        # position_scale = 0.1
 
         # Normalize the input values
+        # normalized_data = self.normalise_input(angle=angle, position=position)
         normalized_data = self.normalise_input(angle=angle, position=position)
         angle_normalized = normalized_data['angle']
-        position_normalized = normalized_data['position']
+        # position_normalized = normalized_data['position']
 
         # we want around 0.5 and 0.0 for angle and position respectively        
         angle_desired = 0.5
-        angle_reward = 0.2-(abs(angle_normalized - angle_desired) * angle_scale)
+        angle_reward = 0.4-(abs(angle_normalized - angle_desired) * angle_scale)
 
-        position_desired = 0.5
-        position_reward = -(abs(position_normalized - position_desired) * position_scale)
+        # position_desired = 0.5
+        # position_reward = -(abs(position_normalized - position_desired) * position_scale)
 
-        reward = angle_reward + position_reward
+        reward = angle_reward# + position_reward
     
         return reward
     
@@ -199,7 +200,7 @@ class PendulumRlAgent:
             state = torch.tensor(state).float().to(self.device)
             next_state = torch.tensor(next_state).float().to(self.device)
             action = torch.tensor(action).long().to(self.device).unsqueeze(0)
-            reward = self.normalise_input(reward = torch.tensor(reward).float().to(self.device).unsqueeze(0))['reward']-0.8
+            reward = self.normalise_input(reward = torch.tensor(reward).float().to(self.device).unsqueeze(0))['reward']
 
             rewards.append(reward)
             q_value = self.model(state).gather(0, action)
@@ -245,7 +246,7 @@ class PendulumRlAgent:
         # Clip rewards to be within a specified range
         # reward_min, reward_max = -1.0, 1.0
         # rewards = torch.clamp(rewards, reward_min, reward_max)
-        rewards -= 0.8
+        # rewards -= 0.8
 
         # Calculate Q-values
         q_values = self.model(states).gather(1, actions)
