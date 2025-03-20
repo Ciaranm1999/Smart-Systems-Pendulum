@@ -9,7 +9,6 @@ import os
 # Before starting run pip install -r requirements.txt
 hp = hyperparameters()
 # Clear the contents of the recording.csv file
-os.makedirs('./training_sessions/session_1', exist_ok=True)
 with open('./recordings/recording.csv', mode='w', newline='') as file:
     file.truncate()
     names=['time', 'theta', 'theta_dot', 'theta_double_dot', 'x_pivot']
@@ -36,9 +35,8 @@ translated_action = ['left', 0]
 action_index = 0 
 
 load_model_number = -1
-if load_model_number > 0:
-
-    agent = PendulumRlAgent(load_model_number)
+if load_model_number > -1:
+    agent = PendulumRlAgent(load_session=load_model_number)
 else:
     agent = PendulumRlAgent()
 
@@ -48,16 +46,16 @@ mean_reward = 0
 
 start_time = time.time()
 
-
+running = True
 
 if __name__=='__main__':
     print("press 'l' to toggle rendering on/off")
     print("press 'p' to toggle print output on/off")
     print("press 'esc' to quit")
-    while epoch < epochs_max:
+    while epoch < epochs_max and running:
         epoch += 1
         digital_twin = DigitalTwin()
-        running = True
+        
         time_in_current_state = 0.
         run_time = 0.
         state_rewards = 0.
@@ -67,6 +65,8 @@ if __name__=='__main__':
             run_time += digital_twin.delta_t
             time_in_current_state += digital_twin.delta_t
             theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step()
+            if abs(x_pivot) > hp.MAX_POSITION:
+                break
             theta_corrected = theta%(2*np.pi)
             state_rewards += agent.reward_calculation(x_pivot, theta_corrected)
             
@@ -132,16 +132,17 @@ print("Training completed")
 # Save the training session details to a file
 # Get the number of files in the ./training_sessions directory
 training_sessions_dir = './training_sessions'
-num_files = len([name for name in os.listdir(training_sessions_dir) if os.path.isfile(os.path.join(training_sessions_dir, name))])
+num_folders = len([name for name in os.listdir(training_sessions_dir) if os.path.isdir(os.path.join(training_sessions_dir, name))])
 training_time = time.time() - start_time
-with open(f'./training_sessions/session_{num_files}/hyperparameters.txt', mode='a') as session_file:
+os.mkdir(f'./training_sessions/session_{num_folders}')
+with open(f'./training_sessions/session_{num_folders}/hyperparameters.txt', mode='a') as session_file:
     session_file.write(f"Training Session Summary:\n")
     session_file.write(f'Number of epochs: {epoch}\n')
     session_file.write(f"Hyper parameters: {hp.to_string()}\n")
     session_file.write(f"Mean reward: {mean_reward}\n")
     session_file.write(f"Training time: {training_time}\n")
 
-agent.save_model()
+agent.save_model(f'./training_sessions/session_{num_folders}')
 print("Model saved")
 # Plot the data
 # Load the data from the CSV file

@@ -141,20 +141,22 @@ class DigitalTwin:
         t1 = duration / 4
         t2_d = duration / 4
         t2 = duration - t2_d
-        self.future_motor_accelerations = [] #Clear the array
-        for t in np.arange(0.0, duration + self.delta_t, self.delta_t):
-            if t <= t1:
-                c = -4 * direction * a_m_1 / (t1 * t1) * t * (t - t1)
-            elif t < t2 and t > t1:
-                c = 0
-            elif t >= t2:
-                c = 4 * direction * a_m_2 / (t2_d * t2_d) * (t - t2) * (t - duration)
 
-            self.future_motor_accelerations.append(c)
+        t_values = np.arange(0.0, duration + self.delta_t, self.delta_t)
+        self.future_motor_accelerations = np.zeros_like(t_values)
+
+        # Vectorized conditions
+        condition1 = t_values <= t1
+        condition2 = (t_values > t1) & (t_values < t2)
+        condition3 = t_values >= t2
+
+        # Vectorized calculations
+        self.future_motor_accelerations[condition1] = -4 * direction * a_m_1 / (t1 * t1) * t_values[condition1] * (t_values[condition1] - t1)
+        self.future_motor_accelerations[condition2] = 0
+        self.future_motor_accelerations[condition3] = 4 * direction * a_m_2 / (t2_d * t2_d) * (t_values[condition3] - t2) * (t_values[condition3] - duration)
 
         _velocity = it.cumulative_trapezoid(self.future_motor_accelerations, initial=0)
         self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0))
-
         # Apply position constraints and adjust acceleration
         # for i, relative_position in enumerate(self.future_motor_positions):
         #     absolute_position = relative_position + self.x_pivot
@@ -168,7 +170,7 @@ class DigitalTwin:
         #         if i > 0:
         #             self.future_motor_accelerations[i] = 0
         #             _velocity[i] = 0
-        self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0)) #recalculate positions after velocity correction
+        # self.future_motor_positions = list(it.cumulative_trapezoid(_velocity, initial=0)) #recalculate positions after velocity correction
         
     
     def get_theta_double_dot(self, theta, theta_dot):
@@ -203,8 +205,10 @@ class DigitalTwin:
         # Get the predicted motor acceleration for the next step and the shift in x_pivot
         self.check_prediction_lists()
         #print(self.future_motor_accelerations)
-        self.currentmotor_acceleration = self.future_motor_accelerations.pop(0)
-        self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)/3
+        self.currentmotor_acceleration = self.future_motor_accelerations[0]
+        self.future_motor_accelerations = np.delete(self.future_motor_accelerations, 0)
+        self.x_pivot = self.x_pivot + self.future_motor_positions[0] / 3
+        self.future_motor_positions = np.delete(self.future_motor_positions, 0)
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
         self.theta += self.theta_dot * self.delta_t

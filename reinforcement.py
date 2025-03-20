@@ -4,6 +4,7 @@ import numpy as np
 import random
 from hyperparameters import hyperparameters
 import pickle
+import os
 
 hp = hyperparameters()
 
@@ -44,11 +45,17 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class PendulumRlAgent:
-    def __init__(self, capacity=10_500_000, network_path=None, replay_buffer_path=None):
+    def __init__(self, capacity=10_500_000, load_session=None):
         self.device = torch.device('cuda')
         self.model = NeuralNetwork().to(self.device)
-        if network_path is not None:
-            self.model.load_state_dict(torch.load(network_path))
+        self.replay_buffer = ReplayBuffer(capacity)
+        if load_session is not None:
+            self.model.load_state_dict(torch.load(f'./training_sessions/session_{load_session}/model.pth'))
+            replay_buffer_path = f'./training_sessions/session_{load_session}/replay_buffer.bin'
+            if os.path.exists(replay_buffer_path):
+                with open(replay_buffer_path, 'rb') as file:
+                    self.replay_buffer = pickle.load(file)
+                
         self.target_model = NeuralNetwork().to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hp.LEARNING_RATE)
@@ -63,11 +70,7 @@ class PendulumRlAgent:
                         ('right', 100), 
                         ('right', 150), 
                         ('right', 200)]
-        if replay_buffer_path is not None:
-            with open(replay_buffer_path, 'rb') as file:
-                self.replay_buffer = pickle.load(file)
-        else:
-            self.replay_buffer = ReplayBuffer(capacity)
+
 
         self.epsilon = hp.EPSILON_START
         self.epsilon_decay = hp.EPSILON_DECAY
@@ -80,9 +83,10 @@ class PendulumRlAgent:
         normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration)
         data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle']]
         x_data = torch.tensor(data).float().to(self.device)
-        logits = self.model(x_data)
-        pred_probab = nn.Softmax(dim=0)(logits)
-        top_action = pred_probab.argmax().item()  # Action with highest probability
+        with torch.no_grad():
+            logits = self.model(x_data)
+            pred_probab = nn.Softmax(dim=0)(logits)
+            top_action = pred_probab.argmax().item()  # Action with highest probability
 
         if random.random() < self.epsilon:  # Explore
             y_pred = random.randint(0, len(self.actions) - 1)
@@ -207,7 +211,7 @@ class PendulumRlAgent:
         if len(self.replay_buffer) < BATCH_SIZE:
             if print_output:
                 print(f"Replay buffer has {len(self.replay_buffer)} samples, waiting for {BATCH_SIZE}")
-            return max_reward
+            return 0
 
         samples = self.replay_buffer.sample(BATCH_SIZE)
 
@@ -238,11 +242,8 @@ class PendulumRlAgent:
 
         # Calculate mean reward
         mean_reward = torch.mean(rewards).item()
-        biggest_reward = torch.max(rewards).item()
-        if biggest_reward > max_reward:
-            max_reward = biggest_reward
         if print_output:
-            print(f"Loss: {loss.item()}\t Reward: {mean_reward}\tepsilon: {self.epsilon}\tMax reward: {max_reward}")
+            print(f"Loss: {loss.item()}\t Reward: {mean_reward}\tepsilon: {self.epsilon}")
 
         # Soft update of target model
         for target_param, param in zip(self.target_model.parameters(), self.model.parameters()):
@@ -254,7 +255,6 @@ class PendulumRlAgent:
             self.target_model.load_state_dict(self.model.state_dict())  # Hard update
             self.hard_update_counter = 0  # Reset the counter
 
-
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
         return mean_reward
 
@@ -264,7 +264,7 @@ class PendulumRlAgent:
         torch.save(self.model.state_dict(), path + 'model.pth')
         
         with open(f'{path}replay_buffer.bin', 'wb') as file:
-            pickle.dump(self.r, file)
+            pickle.dump(self.replay_buffer, file)
         
 
     def load_model(self, path):

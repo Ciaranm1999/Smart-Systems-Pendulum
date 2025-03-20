@@ -19,6 +19,7 @@ class hyperparameters:
     MAX_RUN_TIME = 15.0 # seconds
     SAMPLE_TIME = 0.2 # seconds
     EPOCHS_MAX = 50000
+    MAX_POSITION = 250
 
     PRINT_OUTPUT = False
     RENDER = False
