@@ -50,11 +50,8 @@ class PendulumRlAgent:
         self.model = NeuralNetwork().to(self.device)
         self.replay_buffer = ReplayBuffer(capacity)
         if load_session is not None:
-            self.model.load_state_dict(torch.load(f'./training_sessions/session_{load_session}/model.pth'))
-            replay_buffer_path = f'./training_sessions/session_{load_session}/replay_buffer.bin'
-            if os.path.exists(replay_buffer_path):
-                with open(replay_buffer_path, 'rb') as file:
-                    self.replay_buffer = pickle.load(file)
+            path = f'./training_sessions/session_{load_session}/'
+            self.load_model(path)
                 
         self.target_model = NeuralNetwork().to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -93,7 +90,7 @@ class PendulumRlAgent:
         else:  # Exploit
             y_pred = top_action
         
-        return self.actions[y_pred], y_pred
+        return self.actions[y_pred], y_pred, data
     
     def normalise_input(self, angle=None, angle_velocity=None, angle_acceleration=None, position=None, reward=None):
         """
@@ -151,7 +148,7 @@ class PendulumRlAgent:
 
         # we want around 0.5 and 0.0 for angle and position respectively        
         angle_desired = 0.5
-        angle_reward = 1-(abs(angle_normalized - angle_desired) * angle_scale)
+        angle_reward = 1.0-(abs(angle_normalized - angle_desired) * angle_scale)
 
         reward = angle_reward
     
@@ -261,13 +258,24 @@ class PendulumRlAgent:
     def save_model(self, path):
         if not path.endswith('/'):
             path += '/'
-        torch.save(self.model.state_dict(), path + 'model.pth')
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'epsilon': self.epsilon,
+            'replay_buffer': self.replay_buffer
+        }, path + 'checkpoint.pth') #save all the data into one file.
         
-        with open(f'{path}replay_buffer.bin', 'wb') as file:
-            pickle.dump(self.replay_buffer, file)
         
 
     def load_model(self, path):
-       pass
+        if not path.endswith('/'):
+            path += '/'
+        # checkpoint = torch.load(path + 'checkpoint.pth', map_location=torch.device('cpu'))
+        checkpoint = torch.load(path + 'checkpoint.pth')
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.epsilon = checkpoint['epsilon']
+        self.replay_buffer = checkpoint['replay_buffer']
+        self.target_model.load_state_dict(self.model.state_dict()) #ensure target model is in sync.
 
 

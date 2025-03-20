@@ -5,7 +5,7 @@ class hyperparameters:
     # reinformcement replay buffer class
     LEARNING_RATE = 1e-4
     EPSILON_START = 0.9
-    EPSILON_DECAY = 0.9999
+    EPSILON_DECAY = 0.999
     EPSILON_MIN = 0.05
 
     # reinforcement pendulum class
@@ -16,7 +16,7 @@ class hyperparameters:
     Q_MIN_VALUE = -40
     REWARDS_SCALING = 1/15
     # Lab 1 
-    MAX_RUN_TIME = 15.0 # seconds
+    MAX_RUN_TIME = 30.0 # seconds
     SAMPLE_TIME = 0.2 # seconds
     EPOCHS_MAX = 50000
     MAX_POSITION = 250

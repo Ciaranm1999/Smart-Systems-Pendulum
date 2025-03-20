@@ -52,6 +52,8 @@ if __name__=='__main__':
     print("press 'l' to toggle rendering on/off")
     print("press 'p' to toggle print output on/off")
     print("press 'esc' to quit")
+    completed_runs = 0
+    failed_runs = 0
     while epoch < epochs_max and running:
         epoch += 1
         digital_twin = DigitalTwin()
@@ -61,11 +63,13 @@ if __name__=='__main__':
         state_rewards = 0.
 
         previous_state = []
+        
         while running and run_time < max_run_time:
             run_time += digital_twin.delta_t
             time_in_current_state += digital_twin.delta_t
             theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step()
             if abs(x_pivot) > hp.MAX_POSITION:
+                failed_runs += 1
                 break
             theta_corrected = theta%(2*np.pi)
             state_rewards += agent.reward_calculation(x_pivot, theta_corrected)
@@ -80,16 +84,19 @@ if __name__=='__main__':
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
                 current_state = [theta_corrected, theta_dot, theta_double_dot]
+
+                translated_action, action_index, normalised_state = agent.predict(*current_state)
+                digital_twin.perform_action(translated_action[0], translated_action[1])
+
                 if len(previous_state) == 0:
-                     previous_state = current_state
-                buffer_entry = previous_state + [action_index, state_rewards] + current_state
+                     previous_state = normalised_state
+                buffer_entry = previous_state + [action_index, state_rewards] + normalised_state
                 agent.replay_buffer.push(*buffer_entry)
                 # replay_buffer.append([run_time] +buffer_entry)
                 # code to call the RL agent to get the action
-                translated_action, action_index = agent.predict(*current_state)
-                digital_twin.perform_action(translated_action[0], translated_action[1])
+                
                 sample_time = translated_action[1]/1000
-                previous_state = current_state
+                previous_state = normalised_state
                 state_rewards = 0.
 
             for event in pygame.event.get():
@@ -117,6 +124,7 @@ if __name__=='__main__':
         #     writer = csv.writer(file)
         #     writer.writerows(replay_buffer)
         #     replay_buffer = []
+            
         temp_print = print_output
         if temp_print ==  False:
             if epoch % 100 == 0:
@@ -124,11 +132,13 @@ if __name__=='__main__':
 
         mean_reward = agent.train_faster(temp_print)
         if temp_print:
-            print(f"Epoch {epoch} completed")
+            print(f"Epoch {epoch} completed with {100 - failed_runs} runs.")
+            failed_runs = 0
 
     pygame.quit()
     
 print("Training completed")
+print('Saving model')
 # Save the training session details to a file
 # Get the number of files in the ./training_sessions directory
 training_sessions_dir = './training_sessions'

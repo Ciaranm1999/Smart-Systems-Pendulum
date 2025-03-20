@@ -1,6 +1,11 @@
 .venv/*
+venv_3.9/*
 *.csv
 .vscode/*
 __pycache__/*
 test_*
 training_sessions/*
+.vs/*
+*.sln
+*.pyperf
+*.pyproj
