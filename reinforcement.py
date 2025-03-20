@@ -3,6 +3,7 @@ from torch import nn
 import numpy as np
 import random
 from hyperparameters import hyperparameters
+import pickle
 
 hp = hyperparameters()
 
@@ -43,9 +44,11 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class PendulumRlAgent:
-    def __init__(self, capacity=10_500_000):
+    def __init__(self, capacity=10_500_000, network_path=None, replay_buffer_path=None):
         self.device = torch.device('cuda')
         self.model = NeuralNetwork().to(self.device)
+        if network_path is not None:
+            self.model.load_state_dict(torch.load(network_path))
         self.target_model = NeuralNetwork().to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hp.LEARNING_RATE)
@@ -60,7 +63,11 @@ class PendulumRlAgent:
                         ('right', 100), 
                         ('right', 150), 
                         ('right', 200)]
-        self.replay_buffer = ReplayBuffer(capacity)
+        if replay_buffer_path is not None:
+            with open(replay_buffer_path, 'rb') as file:
+                self.replay_buffer = pickle.load(file)
+        else:
+            self.replay_buffer = ReplayBuffer(capacity)
 
         self.epsilon = hp.EPSILON_START
         self.epsilon_decay = hp.EPSILON_DECAY
@@ -107,7 +114,7 @@ class PendulumRlAgent:
         normalization_ranges = {
             "angle": (0, 2 * np.pi),
             "angle_velocity": (-15.0, 15.0),
-            "angle_acceleration": (-20.0, 20.0),
+            "angle_acceleration": (-30.0, 30.0),
             "position": (-100.0, 100.0),
             "reward": (-80.0, 40.0),
         }
@@ -132,10 +139,8 @@ class PendulumRlAgent:
     def reward_calculation(self, position, angle):
         # Reward function
         angle_scale = 4
-        # position_scale = 0.1
         
         # Normalize the input values
-        # normalized_data = self.normalise_input(angle=angle, position=position)
         normalized_data = self.normalise_input(angle=angle, position=position)
         angle_normalized = normalized_data['angle']
         # position_normalized = normalized_data['position']
@@ -144,15 +149,6 @@ class PendulumRlAgent:
         angle_desired = 0.5
         angle_reward = 1-(abs(angle_normalized - angle_desired) * angle_scale)
 
-        # position_reward = 0.5
-        # if abs(position) > 150:
-        #     position_reward = -1
-        # else:
-        #     position_reward = (150 - abs(position)) / 150
-        # position_desired = 0.5
-        # position_reward = -(abs(position_normalized - position_desired) * position_scale)
-
-        # reward = angle_reward + position_reward
         reward = angle_reward
     
         return reward
@@ -202,7 +198,7 @@ class PendulumRlAgent:
         for target_param, param in zip(self.target_model.parameters(), self.model.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
 
-    def train_faster(self, max_reward=0, print_output=False):
+    def train_faster(self, print_output=False):
         BATCH_SIZE = hp.BATCH_SIZE
         GAMMA = hp.GAMMA
         STATE_DIM = 3
@@ -260,4 +256,18 @@ class PendulumRlAgent:
 
 
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
-        return max_reward
+        return mean_reward
+
+    def save_model(self, path):
+        if not path.endswith('/'):
+            path += '/'
+        torch.save(self.model.state_dict(), path + 'model.pth')
+        
+        with open(f'{path}replay_buffer.bin', 'wb') as file:
+            pickle.dump(self.r, file)
+        
+
+    def load_model(self, path):
+       pass
+
+

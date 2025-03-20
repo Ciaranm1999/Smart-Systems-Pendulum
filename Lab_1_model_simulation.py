@@ -5,9 +5,11 @@ import csv
 from reinforcement import PendulumRlAgent
 import numpy as np
 from hyperparameters import hyperparameters
+import os
 # Before starting run pip install -r requirements.txt
 hp = hyperparameters()
 # Clear the contents of the recording.csv file
+os.makedirs('./training_sessions/session_1', exist_ok=True)
 with open('./recordings/recording.csv', mode='w', newline='') as file:
     file.truncate()
     names=['time', 'theta', 'theta_dot', 'theta_double_dot', 'x_pivot']
@@ -32,11 +34,22 @@ print_output = hp.PRINT_OUTPUT
 max_run_time = hp.MAX_RUN_TIME
 translated_action = ['left', 0]
 action_index = 0 
-agent = PendulumRlAgent()
+
+load_model_number = -1
+if load_model_number > 0:
+
+    agent = PendulumRlAgent(load_model_number)
+else:
+    agent = PendulumRlAgent()
 
 epoch = 0
 epochs_max = hp.EPOCHS_MAX
-max_reward = 0
+mean_reward = 0
+
+start_time = time.time()
+
+
+
 if __name__=='__main__':
     print("press 'l' to toggle rendering on/off")
     print("press 'p' to toggle print output on/off")
@@ -109,13 +122,27 @@ if __name__=='__main__':
             if epoch % 100 == 0:
                 temp_print = True
 
-        max_reward = agent.train_faster(max_reward, temp_print)
+        mean_reward = agent.train_faster(temp_print)
         if temp_print:
             print(f"Epoch {epoch} completed")
 
     pygame.quit()
     
+print("Training completed")
+# Save the training session details to a file
+# Get the number of files in the ./training_sessions directory
+training_sessions_dir = './training_sessions'
+num_files = len([name for name in os.listdir(training_sessions_dir) if os.path.isfile(os.path.join(training_sessions_dir, name))])
+training_time = time.time() - start_time
+with open(f'./training_sessions/session_{num_files}/hyperparameters.txt', mode='a') as session_file:
+    session_file.write(f"Training Session Summary:\n")
+    session_file.write(f'Number of epochs: {epoch}\n')
+    session_file.write(f"Hyper parameters: {hp.to_string()}\n")
+    session_file.write(f"Mean reward: {mean_reward}\n")
+    session_file.write(f"Training time: {training_time}\n")
 
+agent.save_model()
+print("Model saved")
 # Plot the data
 # Load the data from the CSV file
 #%%
