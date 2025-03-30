@@ -9,7 +9,7 @@ import time
 import pandas as pd
 
 class DigitalTwin:
-    def __init__(self):
+    def __init__(self, scale=1.0):
         # Initialize Pygame parameters
         self.screen = None
         # Initialize serial communication parameters
@@ -23,10 +23,10 @@ class DigitalTwin:
         self.x_pivot = 0
         self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
         # Model parameters
-        self.g = 9.81  # Acceleration due to gravity (m/s^2)
+        self.g = 9.81 * scale  # Acceleration due to gravity (m/s^2)
         self.l = 0.4   # Length of the pendulum (m)
-        self.c_air = 0.01  # Air friction coefficient
-        self.c_c = 0.1   # Coulomb friction coefficient
+        self.c_air = 0.001  # Air friction coefficient
+        self.c_c = 0.01 * scale   # Coulomb friction coefficient
         self.a_m = 1000 # Motor acceleration force tranfer coefficient
         self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
@@ -245,3 +245,7 @@ class DigitalTwin:
             self.future_motor_accelerations = [0]
         if len(self.future_motor_positions) == 0:
             self.future_motor_positions = [0]
+
+    def set_gravity_scale(self, scale):
+        self.g = 9.81 * scale
+        self.c_c = 0.01 * scale

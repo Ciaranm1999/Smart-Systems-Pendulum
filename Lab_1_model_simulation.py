@@ -45,9 +45,10 @@ epochs_max = hp.EPOCHS_MAX
 mean_reward = 0
 
 start_time = time.time()
-
+run_times = []
 running = True
-
+scale = hp.SCALE
+manual_mode = hp.MANUAL_MODE
 if __name__=='__main__':
     print("press 'l' to toggle rendering on/off")
     print("press 'p' to toggle print output on/off")
@@ -56,7 +57,7 @@ if __name__=='__main__':
     failed_runs = 0
     while epoch < epochs_max and running:
         epoch += 1
-        digital_twin = DigitalTwin()
+        digital_twin = DigitalTwin(scale=scale)
         
         time_in_current_state = 0.
         run_time = 0.
@@ -79,14 +80,16 @@ if __name__=='__main__':
             
             if render:
                 digital_twin.render(theta_corrected, x_pivot)
-                # time.sleep(digital_twin.delta_t)
+                if manual_mode:
+                    time.sleep(digital_twin.delta_t)
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
                 current_state = [theta_corrected, theta_dot, theta_double_dot]
 
                 translated_action, action_index, normalised_state = agent.predict(*current_state)
-                digital_twin.perform_action(translated_action[0], translated_action[1])
+                if not manual_mode:
+                    digital_twin.perform_action(translated_action[0], translated_action[1])
 
                 if len(previous_state) == 0:
                      previous_state = normalised_state
@@ -94,8 +97,10 @@ if __name__=='__main__':
                 agent.replay_buffer.push(*buffer_entry)
                 # replay_buffer.append([run_time] +buffer_entry)
                 # code to call the RL agent to get the action
-                
-                sample_time = translated_action[1]/1000
+                if translated_action[1] == 0:
+                    sample_time = 0.05
+                else:
+                    sample_time = translated_action[1]/1000
                 previous_state = normalised_state
                 state_rewards = 0.
 
@@ -103,18 +108,33 @@ if __name__=='__main__':
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.KEYDOWN:
-                    # if event.key in digital_twin.actions:
-                    #     direction, duration = digital_twin.actions[event.key]
-                    #     digital_twin.perform_action(direction, duration)
-                    # elif event.key == pygame.K_r:
-                    #         digital_twin = DigitalTwin()  # Restart the system
-                    #         print("System restarted")
+                    if event.key in digital_twin.actions and manual_mode:
+                        direction, duration = digital_twin.actions[event.key]
+                        digital_twin.perform_action(direction, duration)
+                    elif event.key == pygame.K_r:
+                            digital_twin = DigitalTwin(scale=scale)  # Restart the system
+                            print("System restarted")
                     if event.key == pygame.K_ESCAPE:
                         running = False # Quit the simulation
                     elif event.key == pygame.K_l:
-                        render = not render
+                        if not manual_mode:
+                            render = not render
                     elif event.key == pygame.K_p:
                         print_output = not print_output
+                    elif event.key == pygame.K_q:
+                        scale -= 0.1
+                        print(scale)
+                        digital_twin.set_gravity_scale(scale)
+                    elif event.key == pygame.K_w:
+                        scale += 0.1
+                        print(scale)
+                        digital_twin.set_gravity_scale(scale)
+                    elif event.key == pygame.K_m:
+                        manual_mode = not manual_mode
+                        if manual_mode:
+                            print("Manual mode activated")
+                        else:
+                            print("Automatic mode activated")
         # with open(f'./recordings/recording_{epoch}.csv', mode='a', newline='') as file:
         #     writer = csv.writer(file)
         #     writer.writerows(history_buffer)
@@ -129,11 +149,12 @@ if __name__=='__main__':
         if temp_print ==  False:
             if epoch % 100 == 0:
                 temp_print = True
-
+        run_times.append(run_time)
         mean_reward = agent.train_faster(temp_print)
         if temp_print:
-            print(f"Epoch {epoch} completed with {100 - failed_runs} runs.")
+            print(f"Epoch {epoch} completed with {100 - failed_runs} runs.\taverage run time: {np.mean(run_times):.2f}s")
             failed_runs = 0
+            run_times = []
 
     pygame.quit()
     

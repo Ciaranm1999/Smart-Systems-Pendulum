@@ -18,6 +18,16 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(mid_dim, mid_dim),
             nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim),
+            nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim),
+            nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim),
+            nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim),
+            nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim),
+            nn.ReLU(),
             nn.Linear(mid_dim, 9),
         )
 
@@ -150,7 +160,10 @@ class PendulumRlAgent:
         angle_desired = 0.5
         angle_reward = 1.0-(abs(angle_normalized - angle_desired) * angle_scale)
 
-        reward = angle_reward
+        # position_desired = 0.0
+        # position_reward = -(abs(position_normalized - position_desired))
+
+        reward = angle_reward #+ position_reward
     
         return reward
     
@@ -247,10 +260,10 @@ class PendulumRlAgent:
             target_param.data.copy_(target_param.data * (1.0 - TAU) + param.data * TAU)
         
         # Hard update of target model
-        self.hard_update_counter += 1
-        if self.hard_update_counter % self.hard_update_frequency == 0:
-            self.target_model.load_state_dict(self.model.state_dict())  # Hard update
-            self.hard_update_counter = 0  # Reset the counter
+        # self.hard_update_counter += 1
+        # if self.hard_update_counter % self.hard_update_frequency == 0:
+        #     self.target_model.load_state_dict(self.model.state_dict())  # Hard update
+        #     self.hard_update_counter = 0  # Reset the counter
 
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
         return mean_reward
