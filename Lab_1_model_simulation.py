@@ -84,28 +84,28 @@ if __name__=='__main__':
             
             if render:
                 digital_twin.render(theta_corrected, x_pivot)
-                
+                # if manual_mode:
+                #     time.sleep(digital_twin.delta_t)
+                  # Draw the FPS text in the top-right corner
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
-                current_state = [theta_corrected, theta_dot, theta_double_dot, digital_twin.current_omega]
+                current_state = [theta_corrected, theta_dot, theta_double_dot]
 
                 translated_action, action_index, normalised_state = agent.predict(*current_state)
                 if not manual_mode:
-                    digital_twin.perform_action('right', translated_action)
-                    if render and print_output:
-                        print(f"Action: {translated_action}")
+                    digital_twin.perform_action(translated_action[0], translated_action[1])
+
                 if len(previous_state) == 0:
                      previous_state = normalised_state
-                buffer_entry = previous_state + [translated_action, state_rewards] + normalised_state
+                buffer_entry = previous_state + [action_index, state_rewards] + normalised_state
                 agent.replay_buffer.push(*buffer_entry)
                 # replay_buffer.append([run_time] +buffer_entry)
                 # code to call the RL agent to get the action
-                # if translated_action[1] == 0:
-                #     sample_time = 0.05
-                # else:
-                #     sample_time = translated_action[1]/1000
-                sample_time = hp.SAMPLE_TIME
+                if translated_action[1] == 0:
+                    sample_time = 0.05
+                else:
+                    sample_time = translated_action[1]/1000
                 previous_state = normalised_state
                 state_rewards = 0.
 
@@ -117,8 +117,8 @@ if __name__=='__main__':
                         direction, duration = digital_twin.actions[event.key]
                         digital_twin.perform_action(direction, duration)
                     elif event.key == pygame.K_r:
-                        digital_twin = DigitalTwin(scale=scale)  # Restart the system
-                        print("System restarted")
+                            digital_twin = DigitalTwin(scale=scale)  # Restart the system
+                            print("System restarted")
                     if event.key == pygame.K_ESCAPE:
                         running = False # Quit the simulation
                     elif event.key == pygame.K_l:
