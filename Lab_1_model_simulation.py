@@ -90,7 +90,7 @@ if __name__=='__main__':
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
-                current_state = [theta_corrected, theta_dot, theta_double_dot]
+                current_state = [theta_corrected, theta_dot, theta_double_dot, digital_twin.current_omega]
 
                 translated_action, action_index, normalised_state = agent.predict(*current_state)
                 if not manual_mode:
@@ -102,10 +102,6 @@ if __name__=='__main__':
                 agent.replay_buffer.push(*buffer_entry)
                 # replay_buffer.append([run_time] +buffer_entry)
                 # code to call the RL agent to get the action
-                if translated_action[1] == 0:
-                    sample_time = 0.05
-                else:
-                    sample_time = translated_action[1]/1000
                 previous_state = normalised_state
                 state_rewards = 0.
 

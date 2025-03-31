@@ -9,3 +9,4 @@ training_sessions/*
 *.sln
 *.pyperf
 *.pyproj
+gemini/*

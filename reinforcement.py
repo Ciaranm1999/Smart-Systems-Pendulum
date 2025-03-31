@@ -14,21 +14,13 @@ class NeuralNetwork(nn.Module):
         self.flatten = nn.Flatten()
         mid_dim = hp.HIDDEN_LAYER_NODES
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(3, mid_dim),
+            nn.Linear(4, mid_dim),
             nn.ReLU(),
             nn.Linear(mid_dim, mid_dim),
             nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
+            nn.Linear(mid_dim, 64),
             nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, 9),
+            nn.Linear(64, 2),
         )
 
     def forward(self, x):
@@ -68,16 +60,8 @@ class PendulumRlAgent:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hp.LEARNING_RATE)
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3
         # self.loss_fn = nn.MSELoss()
-        self.actions = [('left', 0),	
-                        ('left', 50), 
-                        ('left', 100), 
-                        ('left', 150), 
-                        ('left', 200), 
-                        ('right', 50), 
-                        ('right', 100), 
-                        ('right', 150), 
-                        ('right', 200)]
-
+        self.actions = [('right', 1),	
+                        ('left', 1)]
 
         self.epsilon = hp.EPSILON_START
         self.epsilon_decay = hp.EPSILON_DECAY
@@ -86,9 +70,10 @@ class PendulumRlAgent:
         self.hard_update_counter = 0
         self.hard_update_frequency = 1000
 
-    def predict(self, angle, angle_velocity, angle_acceleration):
-        normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration)
-        data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle']]
+    def predict(self, angle, angle_velocity, angle_acceleration, velocity):
+        # normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration, velocity)
+        # data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle', 'velocity']]
+        data = [angle_velocity, angle_acceleration, angle, velocity]
         x_data = torch.tensor(data).float().to(self.device)
         with torch.no_grad():
             logits = self.model(x_data)
@@ -150,20 +135,20 @@ class PendulumRlAgent:
     def reward_calculation(self, position, angle):
         # Reward function
         angle_scale = 4
-        
+        position_scale = 0.5
         # Normalize the input values
         normalized_data = self.normalise_input(angle=angle, position=position)
         angle_normalized = normalized_data['angle']
-        # position_normalized = normalized_data['position']
+        position_normalized = normalized_data['position']
 
         # we want around 0.5 and 0.0 for angle and position respectively        
         angle_desired = 0.5
-        angle_reward = 1.0-(abs(angle_normalized - angle_desired) * angle_scale)
+        angle_reward = 1.5-(abs(angle_normalized - angle_desired) * angle_scale)
 
-        # position_desired = 0.0
-        # position_reward = -(abs(position_normalized - position_desired))
+        position_desired = 0.0 # Aim for center
+        position_reward = (0.3 - (abs(position - position_desired)))
 
-        reward = angle_reward #+ position_reward
+        reward = angle_reward + position_reward
     
         return reward
     
@@ -215,7 +200,7 @@ class PendulumRlAgent:
     def train_faster(self, print_output=False):
         BATCH_SIZE = hp.BATCH_SIZE
         GAMMA = hp.GAMMA
-        STATE_DIM = 3
+        STATE_DIM = 4
         TAU = hp.TAU
         REWARDS_SCALING = hp.REWARDS_SCALING
         if len(self.replay_buffer) < BATCH_SIZE:
