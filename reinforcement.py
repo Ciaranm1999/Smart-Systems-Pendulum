@@ -133,22 +133,37 @@ class PendulumRlAgent:
         return normalized_data
 
     def reward_calculation(self, position, angle):
-        # Reward function
-        angle_scale = 4
-        position_scale = 0.5
-        # Normalize the input values
-        normalized_data = self.normalise_input(angle=angle, position=position)
-        angle_normalized = normalized_data['angle']
-        position_normalized = normalized_data['position']
+        angle_desired = torch.tensor(1.0 * torch.pi) # Desired angle (upright)
+        position_desired = torch.tensor(0.0)  # Desired position (center)
+        angle_sigma = torch.tensor(0.3 * torch.pi)  # Width of angle "tolerance"
+        position_sigma = torch.tensor(0.1)  # Width of position "tolerance"
+        hanging_threshold = torch.tensor(1.7 * torch.pi) # Angle to consider "hanging"
+        hanging_penalty = 0.5  # Penalty for hanging
+        position_penalty = 0.1 # Penalty for being away from center
+        # --- Angle Reward ---
+        # Wrap angle to be within -pi to pi of desired angle
+        angle_error = torch.abs(angle - angle_desired)
+        angle_error = torch.min(angle_error, 2 * torch.pi - angle_error)  # Wrap-around distance
 
-        # we want around 0.5 and 0.0 for angle and position respectively        
-        angle_desired = 0.5
-        angle_reward = 1.5-(abs(angle_normalized - angle_desired) * angle_scale)
+        angle_reward = torch.exp(-0.5 * (angle_error / angle_sigma) ** 2)  # Gaussian-like reward
 
-        position_desired = 0.0 # Aim for center
-        position_reward = (0.3 - (abs(position - position_desired)))
+        # --- Position Reward ---
+        position_reward = torch.exp(-0.5 * (position / position_sigma) ** 2)
 
-        reward = angle_reward + position_reward
+        # --- Hanging Penalty ---
+        hanging_penalty_term = torch.where(
+            (angle > hanging_threshold) | (angle < (2 * torch.pi - hanging_threshold)),
+            -hanging_penalty,
+            0.0,
+        )
+
+        # --- Position Penalty
+        position_penalty_term = -position_penalty * torch.abs(position)
+
+        # --- Total Reward ---
+        total_reward = angle_reward + position_reward + hanging_penalty_term + position_penalty_term
+
+        return angle_reward + hanging_penalty_term
     
         return reward
     
