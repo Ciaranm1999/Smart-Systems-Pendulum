@@ -14,21 +14,11 @@ class NeuralNetwork(nn.Module):
         self.flatten = nn.Flatten()
         mid_dim = hp.HIDDEN_LAYER_NODES
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(3, mid_dim),
+            nn.Linear(4, mid_dim),
             nn.ReLU(),
             nn.Linear(mid_dim, mid_dim),
             nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim),
-            nn.ReLU(),
-            nn.Linear(mid_dim, 9),
+            nn.Linear(mid_dim, 1),
         )
 
     def forward(self, x):
@@ -56,7 +46,7 @@ class ReplayBuffer:
 
 class PendulumRlAgent:
     def __init__(self, capacity=10_500_000, load_session=None):
-        self.device = torch.device('cuda')
+        self.device = torch.device('cpu')
         self.model = NeuralNetwork().to(self.device)
         self.replay_buffer = ReplayBuffer(capacity)
         if load_session is not None:
@@ -86,23 +76,29 @@ class PendulumRlAgent:
         self.hard_update_counter = 0
         self.hard_update_frequency = 1000
 
-    def predict(self, angle, angle_velocity, angle_acceleration):
-        normalized_data = self.normalise_input(angle, angle_velocity, angle_acceleration)
-        data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle']]
+        self.highest_velocity = 0
+
+    def predict(self, angle, angle_velocity, angle_acceleration, velocity):
+        # normalized_data = self.normalise_input(angle)
+        normalized_data = self.normalise_input(angle=angle, angle_velocity=angle_velocity, angle_acceleration=angle_acceleration, velocity=velocity)
+        data = [normalized_data[key] for key in ['angle_velocity', 'angle_acceleration', 'angle', 'velocity']]
+        # data = [normalized_data['angle']]
         x_data = torch.tensor(data).float().to(self.device)
         with torch.no_grad():
             logits = self.model(x_data)
+            highest_value = logits.max().item()
             pred_probab = nn.Softmax(dim=0)(logits)
             top_action = pred_probab.argmax().item()  # Action with highest probability
 
         if random.random() < self.epsilon:  # Explore
-            y_pred = random.randint(0, len(self.actions) - 1)
+            highest_value = random.uniform(-1, 1)
+            y_pred = 0
         else:  # Exploit
             y_pred = top_action
         
-        return self.actions[y_pred], y_pred, data
+        return highest_value, y_pred, data
     
-    def normalise_input(self, angle=None, angle_velocity=None, angle_acceleration=None, position=None, reward=None):
+    def normalise_input(self, angle=None, angle_velocity=None, angle_acceleration=None, position=None, reward=None, velocity=None):
         """
         Normalizes input values and returns a dictionary of normalized values.
 
@@ -115,7 +111,10 @@ class PendulumRlAgent:
         Returns:
             A dictionary of normalized values.
         """
-
+        if velocity is not None:
+            if velocity > self.highest_velocity:
+                self.highest_velocity = velocity
+        
         def normalize(value, min_val, max_val):
             """Helper function to normalize a single value."""
             if value is None:
@@ -128,6 +127,7 @@ class PendulumRlAgent:
             "angle_acceleration": (-30.0, 30.0),
             "position": (-100.0, 100.0),
             "reward": (-80.0, 40.0),
+            "velocity": (-200.0, 200.0),  
         }
 
         input_values = {
@@ -136,6 +136,7 @@ class PendulumRlAgent:
             "angle_acceleration": angle_acceleration,
             "position": position,
             "reward": reward,
+            "velocity": velocity,
         }
 
         normalized_data = {}
@@ -215,7 +216,7 @@ class PendulumRlAgent:
     def train_faster(self, print_output=False):
         BATCH_SIZE = hp.BATCH_SIZE
         GAMMA = hp.GAMMA
-        STATE_DIM = 3
+        STATE_DIM = 4
         TAU = hp.TAU
         REWARDS_SCALING = hp.REWARDS_SCALING
         if len(self.replay_buffer) < BATCH_SIZE:
@@ -235,7 +236,9 @@ class PendulumRlAgent:
         # rewards = self.normalise_input(reward=rewards)['reward']
         rewards *= REWARDS_SCALING
         # Calculate Q-values
-        q_values = self.model(states).gather(1, actions)
+        temp = self.model(states)
+        q_values = temp.gather(1, actions)
+        # q_values = self.model(states).gather(1, actions)
         
         # Calculate target Q-values
         next_q_values = self.target_model(next_states).max(1)[0].unsqueeze(1)
