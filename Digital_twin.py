@@ -19,7 +19,7 @@ class DigitalTwin:
         self.device_connected = False
         # State configuration parameters
         self.steps = 0
-        self.theta = 0 #np.pi-0.01
+        self.theta = 0.5 * np.pi-0.01
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
@@ -29,7 +29,7 @@ class DigitalTwin:
         self.g = 9.81 * scale  # Acceleration due to gravity (m/s^2)
         self.l = 0.4   # Length of the pendulum (m)
         self.c_air = 0.001  # Air friction coefficient
-        self.c_c = 0.01 * scale   # Coulomb friction coefficient
+        self.c_c = 0.02 * scale   # Coulomb friction coefficient
         self.a_m = 0.0001 # Motor acceleration force tranfer coefficient
         self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
@@ -40,6 +40,12 @@ class DigitalTwin:
         self.sensor_theta = 0
         self.current_sensor_motor_position = 0.
         self.current_action = 0
+
+        # render precalculations
+        self.pendulum_length = (hp.PENDULUM_LENGHT * hp.TRACK_DRAW_LENGTH) / hp.TRACK_LENGTH
+        self.track_x_start = 500 - int(hp.TRACK_DRAW_LENGTH / 2)
+        self.track_x_end = 500 + int(hp.TRACK_DRAW_LENGTH / 2)
+        self.x_pivot_multiplier = hp.TRACK_DRAW_LENGTH / hp.TRACK_LENGTH
         # Keyboard action mappings
         _action_durations = [200, 150, 100, 50]  # Durations in milliseconds
         _keys_left = [pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_f]
@@ -145,8 +151,8 @@ class DigitalTwin:
             else:
                 d = duration
                 # self.ser.write(str(d).encode())
-            if abs(duration) > 0:
-                self.motor_voltage = d * 0.005 * 12 # Scale to 0-12V. *0.005 is a scaling factor to convert the duration to a voltage level.
+            #if abs(duration) > 0:
+            self.motor_voltage = d * 0.005 * 12 # Scale to 0-12V. *0.005 is a scaling factor to convert the duration to a voltage level.
 
 
     # --- Corrected Motor Model Function ---
@@ -295,12 +301,13 @@ class DigitalTwin:
 
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
+        self.theta_dot += self.theta_double_dot * self.delta_t
         self.theta += self.theta_dot * self.delta_t
         if self.theta > 2 * np.pi:
             self.theta -= 2 *np.pi
         elif self.theta < 0:
             self.theta += 2 * np.pi
-        self.theta_dot += self.theta_double_dot * self.delta_t
+        
         self.time += self.delta_t
         self.steps += 1
 
@@ -317,15 +324,19 @@ class DigitalTwin:
     def render(self, theta, x_pivot):
         self.screen.fill((255, 255, 255))
         # Drawing length of the pendulum
-        l = 100
-        self.draw_pendulum((0,0,0),math.cos(theta)*l,math.sin(theta)*l,x_pivot)
+        
+        corrected_pivot = x_pivot * self.x_pivot_multiplier
+        self.draw_pendulum((0,0,0),math.cos(theta)* self.pendulum_length,math.sin(theta)*self.pendulum_length,corrected_pivot)
         # Draw black line and circles for horizontal axis
-        self.draw_line_and_circles((0, 0, 0), [400, 400], [600, 400])
+
+        self.draw_line_and_circles((0, 0, 0), [self.track_x_start, 400], [self.track_x_end, 400])
 
         fps = self.clock.get_fps()  # Get the current FPS
-        fps_text = self.font.render(f"FPS: {int(fps)}", True, (0, 0, 255))  # Render the FPS text in white
+        fps_text = self.font.render(f"FPS: {int(fps)}", True, (0, 0, 0))  # Render the FPS text in white
+        velocity_text = self.font.render(f"Velocity: {(self.current_omega * self.pully_radius) } m/s", True, (0, 0, 0))
         screen = pygame.display.get_surface()  # Get the current display surface
         screen.blit(fps_text, (screen.get_width() - 100, 10))
+        screen.blit(velocity_text, (screen.get_width() - 300, 10))
         pygame.display.flip()
         self.clock.tick(200) 
 

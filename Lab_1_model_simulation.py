@@ -140,6 +140,9 @@ if __name__=='__main__':
                             print("Manual mode activated")
                         else:
                             print("Automatic mode activated")
+                elif event.type == pygame.KEYUP:
+                    if event.key in digital_twin.actions and manual_mode:
+                        digital_twin.perform_action(direction, duration)
         # with open(f'./recordings/recording_{epoch}.csv', mode='a', newline='') as file:
         #     writer = csv.writer(file)
         #     writer.writerows(history_buffer)

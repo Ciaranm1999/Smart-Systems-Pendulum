@@ -28,13 +28,16 @@ class hyperparameters:
 
     # motor class
     MOTOR_R = 1.5  # Resistance in ohms
-    MOTOR_K_t = 0.03  # Torque constant in Nm/A
-    MOTOR_K_e = 0.03  # Back EMF constant in V/(rad/s)
-    MOTOR_J = 4e-5  # Rotor inertia in kg.m^2
+    MOTOR_K_t = 0.00375 * MOTOR_R  # Torque constant in Nm/A
+    MOTOR_K_e = 0.00375 * MOTOR_R  # Back EMF constant in V/(rad/s)
+    MOTOR_J = 9e-5  # Rotor inertia in kg.m^2
     MOTOR_B = 1e-6  # Viscous friction coefficient in Nm.s/rad
     MOTOR_V_MAX = 12.0  # Maximum voltage in volt
     PULLY_RADIUS = 0.01 # 1 cm
 
+    PENDULUM_LENGHT = 0.35  # Length of the pendulum in meters
+    TRACK_LENGTH = 0.5 # Length of the track in meters
+    TRACK_DRAW_LENGTH = 300 # Length of the track in pixels
     OLD_METHOD = False  # Use the old method for calculating the motor model
     @staticmethod
     def to_string():
