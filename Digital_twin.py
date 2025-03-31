@@ -19,11 +19,11 @@ class DigitalTwin:
         self.device_connected = False
         # State configuration parameters
         self.steps = 0
-        self.theta = 0.5 * np.pi-0.01
+        self.theta = 0.0 #0.5 * np.pi-0.01
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
-        self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
+        self.delta_t = 0.01  # Example value, adjust as needed in seconds 19.42879347
         
         # Model parameters
         self.g = 9.81 * scale  # Acceleration due to gravity (m/s^2)
@@ -152,7 +152,7 @@ class DigitalTwin:
                 d = duration
                 # self.ser.write(str(d).encode())
             #if abs(duration) > 0:
-            self.motor_voltage = d * 0.005 * 12 # Scale to 0-12V. *0.005 is a scaling factor to convert the duration to a voltage level.
+            self.motor_voltage = d * hp.MOTOR_V_MAX # Scale to 0-12V. *0.005 is a scaling factor to convert the duration to a voltage level.
 
 
     # --- Corrected Motor Model Function ---
@@ -338,7 +338,7 @@ class DigitalTwin:
         screen.blit(fps_text, (screen.get_width() - 100, 10))
         screen.blit(velocity_text, (screen.get_width() - 300, 10))
         pygame.display.flip()
-        self.clock.tick(200) 
+        self.clock.tick(100) 
 
     def check_prediction_lists(self):
         if len(self.future_motor_accelerations) == 0:
