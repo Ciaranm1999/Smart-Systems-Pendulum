@@ -49,6 +49,7 @@ run_times = []
 running = True
 scale = hp.SCALE
 manual_mode = hp.MANUAL_MODE
+
 if __name__=='__main__':
     print("press 'l' to toggle rendering on/off")
     print("press 'p' to toggle print output on/off")
@@ -58,7 +59,7 @@ if __name__=='__main__':
     while epoch < epochs_max and running:
         epoch += 1
         digital_twin = DigitalTwin(scale=scale)
-        
+
         time_in_current_state = 0.
         run_time = 0.
         state_rewards = 0.
@@ -68,7 +69,10 @@ if __name__=='__main__':
         while running and run_time < max_run_time:
             run_time += digital_twin.delta_t
             time_in_current_state += digital_twin.delta_t
-            theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step()
+            if hp.OLD_METHOD:
+                theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step()
+            else:
+                theta, theta_dot, theta_double_dot, x_pivot = digital_twin.step_2()
             if abs(x_pivot) > hp.MAX_POSITION:
                 failed_runs += 1
                 break
@@ -80,8 +84,9 @@ if __name__=='__main__':
             
             if render:
                 digital_twin.render(theta_corrected, x_pivot)
-                if manual_mode:
-                    time.sleep(digital_twin.delta_t)
+                # if manual_mode:
+                #     time.sleep(digital_twin.delta_t)
+                  # Draw the FPS text in the top-right corner
 
             if time_in_current_state >= sample_time:
                 time_in_current_state = 0.
@@ -144,7 +149,8 @@ if __name__=='__main__':
         #     writer = csv.writer(file)
         #     writer.writerows(replay_buffer)
         #     replay_buffer = []
-            
+
+         # Limit to 60 FPS
         temp_print = print_output
         if temp_print ==  False:
             if epoch % 100 == 0:

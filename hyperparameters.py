@@ -17,15 +17,25 @@ class hyperparameters:
     REWARDS_SCALING = 1/15
     # Lab 1 
     MAX_RUN_TIME = 60.0 # seconds
-    SAMPLE_TIME = 0.2 # seconds
+    SAMPLE_TIME = 0.05 # seconds
     EPOCHS_MAX = 50000
     MAX_POSITION = 350
 
     PRINT_OUTPUT = False
     RENDER = True
-    SCALE = 0.3
-    MANUAL_MODE = False
+    SCALE = 1
+    MANUAL_MODE = True
 
+    # motor class
+    MOTOR_R = 1.5  # Resistance in ohms
+    MOTOR_K_t = 0.03  # Torque constant in Nm/A
+    MOTOR_K_e = 0.03  # Back EMF constant in V/(rad/s)
+    MOTOR_J = 4e-5  # Rotor inertia in kg.m^2
+    MOTOR_B = 1e-6  # Viscous friction coefficient in Nm.s/rad
+    MOTOR_V_MAX = 12.0  # Maximum voltage in volt
+    PULLY_RADIUS = 0.01 # 1 cm
+
+    OLD_METHOD = False  # Use the old method for calculating the motor model
     @staticmethod
     def to_string():
         attributes = {attr: getattr(hyperparameters, attr) for attr in dir(hyperparameters) 
