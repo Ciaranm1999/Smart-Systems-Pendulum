@@ -22,5 +22,9 @@ if __name__=='__main__':
                     if event.key in digital_twin.actions:
                         direction, duration = digital_twin.actions[event.key]
                         digital_twin.perform_action(direction, duration)
-
+                    elif event.key == pygame.K_r:
+                        digital_twin = DigitalTwin()  # Restart the system
+                        print("System restarted")
+                    elif event.key == pygame.K_ESCAPE:
+                        running = False # Quit the simulation
         pygame.quit()
