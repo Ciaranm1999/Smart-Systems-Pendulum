@@ -8,6 +8,9 @@ import scipy.integrate as it
 import time
 import pandas as pd
 
+import hyperparameters
+hp = hyperparameters.hyperparameters()
+
 class DigitalTwin:
     def __init__(self):
         # Initialize Pygame parameters
@@ -21,14 +24,14 @@ class DigitalTwin:
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
-        self.delta_t = 0.005  # Example value, adjust as needed in seconds 19.42879347
+        self.delta_t = hp.DELTA_T  # Example value, adjust as needed in seconds 19.42879347
         # Model parameters
-        self.g = 9.81  # Acceleration due to gravity (m/s^2)
-        self.l = 0.4   # Length of the pendulum (m)
-        self.c_air = 0.01  # Air friction coefficient
-        self.c_c = 0.1   # Coulomb friction coefficient
-        self.a_m = 1000 # Motor acceleration force tranfer coefficient
-        self.m = 0.3 # Mass of the pendulum
+        self.g = hp.GRAVITY  # Acceleration due to gravity (m/s^2)
+        self.l = hp.PENDULUM_LENGHT   # Length of the pendulum (m)
+        self.c_air = hp.AIR_FRICTION  # Air friction coefficient
+        self.c_c = hp.COLOUMB_FRICTION   # Coulomb friction coefficient
+        self.a_m = 1 # Motor acceleration force tranfer coefficient
+        self.m = hp.PENDULUM_MASS # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
@@ -37,6 +40,24 @@ class DigitalTwin:
         self.sensor_theta = 0
         self.current_sensor_motor_position = 0.
         self.current_action = 0
+
+        # Parameters that have to do with the new motor model
+        self.R = hp.MOTOR_R  # Armature Resistance (Ohms)
+        self.K_t = hp.MOTOR_K_t  # Torque Constant (Nm/A)
+        self.K_e = hp.MOTOR_K_e  # Back EMF Constant (V/(rad/s)) - Often numerically equal to K_t in SI
+        self.J = hp.MOTOR_J  # Rotor Inertia (kg.m^2)
+        self.b = hp.MOTOR_B  # Viscous Friction Coefficient (Nm.s/rad)
+        self.pully_circumference = hp.PULLY_RADIUS * 2 * np.pi  # Circumference of the pulley (m)
+        self.pully_radius = hp.PULLY_RADIUS  # Circumference of the pulley (m)
+        self.current_omega = 0.0  # Initial angular velocity (rad/s)
+        self.motor_voltage = hp.MOTOR_V_MAX  # Initial motor voltage (V)
+
+        # render precalculations
+        self.pendulum_length = (hp.PENDULUM_LENGHT * hp.TRACK_DRAW_LENGTH) / hp.TRACK_LENGTH
+        self.track_x_start = 500 - int(hp.TRACK_DRAW_LENGTH / 2)
+        self.track_x_end = 500 + int(hp.TRACK_DRAW_LENGTH / 2)
+        self.x_pivot_multiplier = hp.TRACK_DRAW_LENGTH / hp.TRACK_LENGTH
+
         # Keyboard action mappings
         _action_durations = [200, 150, 100, 50]  # Durations in milliseconds
         _keys_left = [pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_f]
@@ -127,6 +148,34 @@ class DigitalTwin:
         if duration > 0:
             self.update_motor_accelerations(direction, duration/1000)
 
+    def motor_model_dynamics(self, voltage, omega, R, K_t, K_e, J, b):
+        """
+        Calculates the angular acceleration (dω/dt) of the DC motor.
+
+        Args:
+            voltage (float): Current input voltage (V).
+            omega (float): Current angular velocity (rad/s).
+            R (float): Armature Resistance (Ohms).
+            K_t (float): Torque Constant (Nm/A).
+            K_e (float): Back EMF Constant (V/(rad/s)).
+            J (float): Rotor Inertia (kg.m^2).
+            b (float): Viscous Friction Coefficient (Nm.s/rad).
+
+        Returns:
+            float: Angular acceleration (dω/dt) in rad/s^2.
+        """
+        # Calculate current based on V, omega, K_e, R (can skip if not needed elsewhere)
+        # current_I = (voltage - K_e * omega) / R
+        # Calculate motor torque (τ_m)
+        # tau_m = K_t * current_I
+        # Combined torque calculation:
+        tau_m = (K_t / R) * voltage - (K_t * K_e / R) * omega
+
+        # Calculate angular acceleration (dω/dt)
+        domega_dt = (1.0 / J) * (tau_m - b * omega)
+
+        return domega_dt
+    
     def update_motor_accelerations(self, direction, duration):
         if direction == 'left':
             direction = -1
@@ -136,6 +185,12 @@ class DigitalTwin:
         """
         Lab 1 & 3 bonus: Model the expected acceleration response of the motor.  
         """
+
+        total_samples = int(duration/self.delta_t) + 1
+        self.future_motor_accelerations = []
+        self.future_motor_positions = []
+        for i in range(total_samples):
+            acceleration = self.motor_model_dynamics(self.motor_voltage, self.omega, self.R, self.K_t, self.K_e, self.J, self.b)
         a_m_1 = 0.05
         a_m_2 = 0.05
         t1 = duration/4
@@ -191,8 +246,9 @@ class DigitalTwin:
         self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)/3
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
-        self.theta += self.theta_dot * self.delta_t
         self.theta_dot += self.theta_double_dot * self.delta_t
+        self.theta += self.theta_dot * self.delta_t
+
         self.time += self.delta_t
         self.steps += 1
 
@@ -210,10 +266,11 @@ class DigitalTwin:
     def render(self, theta, x_pivot):
         self.screen.fill((255, 255, 255))
         # Drawing length of the pendulum
-        l = 100
-        self.draw_pendulum((0,0,0),math.cos(theta)*l,math.sin(theta)*l,x_pivot)
+        corrected_pivot = x_pivot * self.x_pivot_multiplier
+        self.draw_pendulum((0,0,0),math.cos(theta)* self.pendulum_length,math.sin(theta)*self.pendulum_length,corrected_pivot)
         # Draw black line and circles for horizontal axis
-        self.draw_line_and_circles((0, 0, 0), [400, 400], [600, 400])
+
+        self.draw_line_and_circles((0, 0, 0), [self.track_x_start, 400], [self.track_x_end, 400]) 
         pygame.display.flip()
 
     def check_prediction_lists(self):
