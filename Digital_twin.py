@@ -146,7 +146,7 @@ class DigitalTwin:
                 d = duration
             self.ser.write(str(d).encode())
         if duration > 0:
-            self.update_motor_accelerations(direction, duration/1000)
+            self.update_motor_accelerations_2(direction, duration/1000)
 
     def motor_model_dynamics(self, voltage, omega, R, K_t, K_e, J, b):
         """
@@ -175,7 +175,87 @@ class DigitalTwin:
         domega_dt = (1.0 / J) * (tau_m - b * omega)
 
         return domega_dt
-    
+    def update_motor_accelerations_2(self, direction, duration):
+
+        """
+        Simulates the motor's acceleration and CALCULATES RELATIVE POSITION change
+        over a duration using the physical model and a specific voltage profile:
+        - Phase 1 (e.g., 1st 3/4 duration): Full Voltage
+        - Phase 2 (e.g., Last 1/4 duration): Zero Voltage (Coast/Dynamic Braking)
+
+        The output position list contains angular positions relative to the
+        starting position at the time this function is called.
+
+        Args:
+            direction (str): 'left' or 'right'.
+            duration (float): Total simulation duration (s).
+        """
+        if direction == 'left':
+            direction_multiplier = -1
+        else: # 'right'
+            direction_multiplier = 1
+
+        # Reset instantaneous velocity state for the new simulation run
+        # Keep any absolute position state separate if needed elsewhere in the class
+        self.current_omega = 0.0
+
+        # Initialize lists for output
+        self.future_motor_accelerations = []
+        self.future_motor_positions = []
+
+        # --- Track position RELATIVE to the start of this simulation ---
+        relative_position = 0.0
+        # Add the initial relative position (0)
+        self.future_motor_positions.append(relative_position)
+
+        # --- Define Phase Timing ---
+        # Point where voltage switches from full to zero
+        t_voltage_off = duration * 0.75 # Adjust fraction as needed
+
+        # --- Simulation Loop ---
+        num_steps = int(round(duration / self.delta_t))
+        if num_steps <= 0:
+            print("Warning: Duration too short for the given delta_t.")
+            # Still return the initial relative position if no steps run
+            return
+
+        for i in range(num_steps):
+            # Calculate time at the *start* of the interval for voltage decision
+            current_interval_start_time = i * self.delta_t
+
+            # --- Voltage Control Strategy (Full Voltage then Zero Voltage) ---
+            if current_interval_start_time < t_voltage_off:
+                # Phase 1: Apply full voltage
+                applied_voltage = direction_multiplier * self.motor_voltage
+            else:
+                # Phase 2: Apply zero voltage
+                applied_voltage = 0.0
+            # --- End Voltage Control ---
+
+            # 1. Calculate current acceleration using the model
+            angular_acceleration = self.motor_model_dynamics(
+                applied_voltage,
+                self.current_omega, # Use omega from the beginning of the timestep
+                self.R, self.K_t, self.K_e, self.J, self.b
+            )
+            linear_acceleration = angular_acceleration * self.pully_radius
+            # Store the calculated acceleration for this step
+            self.future_motor_accelerations.append(linear_acceleration)
+
+            # 2. Update velocity for the *end* of this step / start of next (Forward Euler)
+            # NOTE: self.current_omega still needs to be updated for the dynamics calculation
+            next_omega = self.current_omega + angular_acceleration * self.delta_t
+
+            # 3. Calculate CHANGE in position during this step and update relative position
+            #    Using next_omega (velocity at end of interval) * delta_t
+            delta_position = next_omega *self.pully_radius * self.delta_t
+            relative_position = relative_position + delta_position
+
+            # Store the calculated CUMULATIVE RELATIVE position
+            self.future_motor_positions.append(relative_position)
+
+            # 4. Update omega state for the next iteration's dynamics calculation
+            self.current_omega = next_omega
     def update_motor_accelerations(self, direction, duration):
         if direction == 'left':
             direction = -1
@@ -186,11 +266,17 @@ class DigitalTwin:
         Lab 1 & 3 bonus: Model the expected acceleration response of the motor.  
         """
 
-        total_samples = int(duration/self.delta_t) + 1
-        self.future_motor_accelerations = []
-        self.future_motor_positions = []
-        for i in range(total_samples):
-            acceleration = self.motor_model_dynamics(self.motor_voltage, self.omega, self.R, self.K_t, self.K_e, self.J, self.b)
+        # total_samples = int(duration/self.delta_t) + 1
+        # self.future_motor_accelerations = []
+        # self.future_motor_positions = []
+        # self.current_omega = 0.0  # Reset current omega for each action
+        # for i in range(total_samples):
+        #     angular_acceleration = self.motor_model_dynamics(self.motor_voltage, self.current_omega, self.R, self.K_t, self.K_e, self.J, self.b)
+        #     self.current_omega += acceleration * self.delta_t
+
+        #     linear_acceleration = acceleration * self.pully_radius
+        #     self.future_motor_accelerations.append(linear_acceleration)
+
         a_m_1 = 0.05
         a_m_2 = 0.05
         t1 = duration/4
