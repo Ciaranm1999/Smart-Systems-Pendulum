@@ -1,6 +1,6 @@
 class hyperparameters:
     # Digital twin
-    DELTA_T  = 0.005  # Time step for the simulation in seconds
+    DELTA_T  = 0.01  # Time step for the simulation in seconds
     GRAVITY = 9.81  # m/s^2, acceleration due to gravity
     PENDULUM_LENGHT = 0.35  # Length of the pendulum in meters
     PENDULUM_MASS = 0.3  # kg, mass of the pendulum bob
