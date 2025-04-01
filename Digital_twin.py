@@ -30,7 +30,7 @@ class DigitalTwin:
         self.l = hp.PENDULUM_LENGHT   # Length of the pendulum (m)
         self.c_air = hp.AIR_FRICTION  # Air friction coefficient
         self.c_c = hp.COLOUMB_FRICTION   # Coulomb friction coefficient
-        self.a_m = 1 # Motor acceleration force tranfer coefficient
+        self.a_m = hp.PENDULUM_MOTOR_FORCE_MULTIPLIER # Motor acceleration force tranfer coefficient
         self.m = hp.PENDULUM_MASS # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
@@ -329,7 +329,7 @@ class DigitalTwin:
         self.check_prediction_lists()
         #print(self.future_motor_accelerations)
         self.currentmotor_acceleration = self.future_motor_accelerations.pop(0)
-        self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)/3
+        self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
         self.theta_dot += self.theta_double_dot * self.delta_t
