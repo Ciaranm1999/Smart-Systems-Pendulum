@@ -20,7 +20,7 @@ class DigitalTwin:
         self.device_connected = False
         # State configuration parameters
         self.steps = 0
-        self.theta = 0.#np.pi-0.01
+        self.theta = 0.5*np.pi #np.pi-0.01
         self.theta_dot = 0.
         self.theta_double_dot = 0.
         self.x_pivot = 0
@@ -80,6 +80,8 @@ class DigitalTwin:
         # Set up the drawing window
         pygame.init()
         self.screen = pygame.display.set_mode([1000, 800])
+        self.font = pygame.font.Font(None, 36)  # Initialize font (36 is the font size)
+        self.clock = pygame.time.Clock()
 
     def connect_device(self, port='COM3', baudrate=115200):
         # Establish a serial connection for sensor data
@@ -357,8 +359,14 @@ class DigitalTwin:
         # Draw black line and circles for horizontal axis
 
         self.draw_line_and_circles((0, 0, 0), [self.track_x_start, 400], [self.track_x_end, 400]) 
+        
+        # Display FPS in the top right corner
+        fps = self.clock.get_fps()  # Get the current FPS
+        fps_text = self.font.render(f"FPS: {int(fps)}", True, (0, 0, 0))  # Render the FPS text in white
+        screen = pygame.display.get_surface()  # Get the current display surface
+        screen.blit(fps_text, (screen.get_width() - 100, 10))
         pygame.display.flip()
-
+        self.clock.tick(100) 
     def check_prediction_lists(self):
         if len(self.future_motor_accelerations) == 0:
             self.future_motor_accelerations = [0]
