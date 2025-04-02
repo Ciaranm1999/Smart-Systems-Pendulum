@@ -73,8 +73,11 @@ class DigitalTwin:
         self.writer = None
         self.start_time = 0.
         self.df = None
+        self.window_intialized = False
         # Initialize a pygame window
-        self.initialize_pygame_window()
+        if hp.RENDER:
+            self.initialize_pygame_window()
+            self.window_intialized = True
 
     def initialize_pygame_window(self):
         # Set up the drawing window

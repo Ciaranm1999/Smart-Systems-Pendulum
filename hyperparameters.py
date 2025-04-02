@@ -9,7 +9,7 @@ class hyperparameters:
     AIR_FRICTION = 0.001  # Coefficient of air friction
 
     TRACK_LENGTH = 0.27 # Length of the track in meters
-    TRACK_DRAW_LENGTH = 300 # Length of the track in pixels
+    TRACK_DRAW_LENGTH = 250 # Length of the track in pixels
 
     # motor class
     MOTOR_R =7  # Resistance in ohms
@@ -21,3 +21,5 @@ class hyperparameters:
     PULLY_RADIUS = 0.005 # 1 cm
 
     range_encoder = 163
+
+    RENDER = False
