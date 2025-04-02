@@ -31,11 +31,6 @@ class DigitalTwin:
         self.c_c = 0.1   # Coulomb friction coefficient
         self.a_m = 1000 # Motor acceleration force tranfer coefficient
         self.m = 0.3 # Mass of the pendulum
-        self.l = 0.4   # Length of the pendulum (m)
-        self.c_air = 0.05  # Air friction coefficient
-        self.c_c = 0.2   # Coulomb friction coefficient
-        self.a_m = 2000 # Motor acceleration force tranfer coefficient
-        self.m = 0.3 # Mass of the pendulum
         self.future_motor_accelerations = []
         self.future_motor_positions = []
         self.currentmotor_acceleration = 0.
@@ -102,12 +97,14 @@ class DigitalTwin:
         self.current_sensor_motor_position = 0
         
     def start_recording(self, name):
-        # If you are working on the bonus assignments then you should also add a columb for actions (and safe those).
+        """
+        Start recording simulation data, including energies.
+        """
         self.recording = True
-        self.file = open('{}.csv'.format(name), 'w', newline='')  
+        self.file = open('{}.csv'.format(name), 'w', newline='')
         self.writer = csv.writer(self.file)
         self.start_time = round(time.time() * 1000)
-        self.writer.writerow(["time", "theta", "x_pivot"])
+        self.writer.writerow(["time", "theta", "x_pivot", "PE", "KE", "TE"])
 
     def stop_recording(self):
         self.recording = False
@@ -163,15 +160,25 @@ class DigitalTwin:
         _velocity = it.cumulative_trapezoid(self.future_motor_accelerations,initial=0)
         self.future_motor_positions = list(it.cumulative_trapezoid(_velocity,initial=0))
     
-    
+    def calculate_energies(self):
+        """
+        Calculate Potential Energy (PE), Kinetic Energy (KE), and Total Energy (TE).
+        """
+        # Potential Energy (PE)
+        h = self.l * (1 - math.cos(self.theta))  # Height of the pendulum bob
+        PE = self.m * self.g * h
+
+        # Kinetic Energy (KE)
+        v = self.l * self.theta_dot  # Linear velocity
+        KE = 0.5 * self.m * v**2
+
+        # Total Energy (TE)
+        TE = PE + KE
+
+        return PE, KE, TE
+
     def get_theta_double_dot(self, theta, theta_dot):
         """
-        Computes the angular acceleration (theta_double_dot) for the pendulum
-        considering:
-        - Motor acceleration
-        - Gravity
-        - Coulomb friction
-        - Air friction
         Computes the angular acceleration (theta_double_dot) for the pendulum
         considering:
         - Motor acceleration
@@ -189,29 +196,34 @@ class DigitalTwin:
         # Coulomb friction
         coulomb_friction = -((self.c_c * np.sign(theta_dot)) / (self.m * self.l**2))
 
-        # Total torque
-        total_torque = torque_gravity + torque_air_friction + torque_coulomb_friction + torque_motor
-
-        # Angular acceleration
-        #theta_double_dot = total_torque / self.l
-
-        theta_double_dot = -(1/self.l) * self.currentmotor_acceleration * np.cos(theta)*self.a_m - (self.c_c * theta_dot) - ((self.g * np.sin(theta))/self.l) - (self.c_air * theta_dot)
-    
+        # Air friction term
+        air_friction = - (self.c_air * theta_dot) / (self.m * self.l**2)
+        
+        # Total angular acceleration
+        theta_double_dot = motor_torque + gravity_torque + coulomb_friction + air_friction
+        
         return theta_double_dot
 
     
     def step(self):
         # Get the predicted motor acceleration for the next step and the shift in x_pivot
         self.check_prediction_lists()
-        #print(self.future_motor_accelerations)
         self.currentmotor_acceleration = self.future_motor_accelerations.pop(0)
-        self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0)/3
+        self.x_pivot = self.x_pivot + self.future_motor_positions.pop(0) / 3
+
         # Update the system state based on the action and model dynamics
         self.theta_double_dot = self.get_theta_double_dot(self.theta, self.theta_dot)
         self.theta += self.theta_dot * self.delta_t
         self.theta_dot += self.theta_double_dot * self.delta_t
         self.time += self.delta_t
         self.steps += 1
+
+        # Calculate energies
+        PE, KE, TE = self.calculate_energies()
+
+        # Optionally, log the energies for analysis
+        if self.recording:
+            self.writer.writerow([round(self.time * 1000), self.theta, self.x_pivot, PE, KE, TE])
 
         return self.theta, self.theta_dot, self.x_pivot
         
