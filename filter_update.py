@@ -112,13 +112,13 @@ class DataFilter:
     def plot(self, filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=None):
         # Dictionary to map names to the actual data
         filter_data = {
-            "original": self.original,
-            "ema": self.ema,
-            "median": self.median,
-            "kalman": self.kalman_filtered,
+            key: self.to_radians(val) for key, val in {
+                "original": self.original,
+                "ema": self.ema,
+                "median": self.median,
+                "kalman": self.kalman_filtered
+            }.items()
         }
-
-
 
         # Labels and line styles
         styles = {
@@ -166,9 +166,9 @@ if __name__ == "__main__":
     df_test.compute_error_metrics()
     # df_test.save_filtered_data("filtered_free_fall_output.csv")
     # df_test.plot(filters_to_plot=["original"])
-    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(200, 500))  
-    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(200, 500))
-    df_test.plot(filters_to_plot=["original", "median"], range_to_plot=(200, 500))  
+    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(0, 500))  
+    df_test.plot(filters_to_plot=["original", "median"], range_to_plot=(0, 500))  
+    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(0, 500))
 
 
     # Test data
