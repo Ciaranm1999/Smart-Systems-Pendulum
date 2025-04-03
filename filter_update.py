@@ -34,6 +34,12 @@ class DataFilter:
         self.ema = []
         self.median = []
         self.kalman_filtered = []
+        # Sensor conversion parameters
+        self.sensor_max = 1024
+        self.sensor_min = -1024
+        self.sensor_range = self.sensor_max - self.sensor_min
+        self.offset_radians = 0.022  # Adjust based on your calibration
+
 
     def load_data(self, start=0, end=None):
         df = pd.read_csv(self.file_path)
@@ -45,6 +51,9 @@ class DataFilter:
         self.time = df['time'][start:end].values if 'time' in df.columns else np.arange(start, end)
 
         return df
+    
+    def to_radians(self, data):
+        return ((np.array(data) - self.sensor_min) * (np.pi / self.sensor_range)) - (0.5 * np.pi) - self.offset_radians
 
 
     def apply_filters(self):
@@ -103,11 +112,14 @@ class DataFilter:
     def plot(self, filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=None):
         # Dictionary to map names to the actual data
         filter_data = {
-            "original": self.original,
-            "ema": self.ema,
-            "median": self.median,
-            "kalman": self.kalman_filtered
+            key: self.to_radians(val) for key, val in {
+                "original": self.original,
+                "ema": self.ema,
+                "median": self.median,
+                "kalman": self.kalman_filtered
+            }.items()
         }
+
 
         # Labels and line styles
         styles = {
@@ -135,7 +147,7 @@ class DataFilter:
                 )
         plt.title(f"Filtered Plot: {', '.join([f.capitalize() for f in filters_to_plot])}")
         plt.xlabel("Time" if hasattr(self, "time") else "Sample Index")
-        plt.ylabel("Value")
+        plt.ylabel("Theta (radians)")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
@@ -148,22 +160,24 @@ if __name__ == "__main__":
 
 
  # Test data
-    df_test = DataFilter("data_points_free_fall_40Hz - Copy.csv", column_name="xAccl", alpha=0.3, kernel_size=11,
-                kalman_process_var=1e-5, kalman_measurement_var=1e-4) ##5-4:ok // 
+    df_test = DataFilter("data_points_free_fall_40Hz - Copy.csv", column_name="xAccl", alpha=0.4, kernel_size=11,
+                kalman_process_var=1e-5, kalman_measurement_var=1e-4) ##5-4:ok //  alpha=0.4, kernel_size=11
     df_test.load_data(start=0, end=1500)
     df_test.apply_filters()
     df_test.compute_error_metrics()
+
     # df_test.save_filtered_data("filtered_free_fall_output.csv")
-    df_test.plot(filters_to_plot=["original"])
-    df_test.plot(filters_to_plot=["original", "median"])  
-    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(1200, 1500))  
-    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(1200, 1500))
+    # df_test.plot(filters_to_plot=["original"])
+    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(200, 500))  
+    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(200, 500))
+    df_test.plot(filters_to_plot=["original", "median"], range_to_plot=(200, 500))  
+
 
     # Test data
-    df_test = DataFilter("test_data.csv", column_name="theta", alpha=0.04, kernel_size=41) ##0.05
-    df_test.load_data()
-    df_test.apply_filters()
-    df_test.compute_error_metrics()
+    # df_test = DataFilter("test_data.csv", column_name="theta", alpha=0.04, kernel_size=41) ##0.05
+    # df_test.load_data()
+    # df_test.apply_filters()
+    # df_test.compute_error_metrics()
     # df_test.save_filtered_data("filtered_test_output.csv")
     # df_test.plot(filters_to_plot=["original", "ema"])  
     # df_test.plot(filters_to_plot=["ema", "median"])
@@ -180,4 +194,8 @@ if __name__ == "__main__":
     # df_data_3.load_data()
     # df_data_3.apply_filters()
     # df_data_3.plot(filters_to_plot=["original","ema"])
+
+
+
+## do FFT on the signal and plot the spectrum to find the noise frequency of the original signal
 
