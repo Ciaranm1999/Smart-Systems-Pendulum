@@ -35,12 +35,17 @@ class DataFilter:
         self.median = []
         self.kalman_filtered = []
 
-    def load_data(self):
+    def load_data(self, start=0, end=None):
         df = pd.read_csv(self.file_path)
-        self.data = df[self.column_name][:1500].values
-        self.time = df['time'][:1500].values if 'time' in df.columns else np.arange(len(df))
+        
+        if end is None:
+            end = len(df)
+        
+        self.data = df[self.column_name][start:end].values
+        self.time = df['time'][start:end].values if 'time' in df.columns else np.arange(start, end)
 
         return df
+
 
     def apply_filters(self):
         buffer = np.zeros(self.kernel_size)
@@ -145,12 +150,13 @@ if __name__ == "__main__":
  # Test data
     df_test = DataFilter("data_points_free_fall_40Hz - Copy.csv", column_name="xAccl", alpha=0.3, kernel_size=11,
                 kalman_process_var=1e-5, kalman_measurement_var=1e-4) ##5-4:ok // 
-    df_test.load_data()
+    df_test.load_data(start=0, end=1500)
     df_test.apply_filters()
     df_test.compute_error_metrics()
-    df_test.save_filtered_data("filtered_free_fall_output.csv")
-    # df_test.plot(filters_to_plot=["original", "median"])  
-    # df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(1200, 1500))  
+    # df_test.save_filtered_data("filtered_free_fall_output.csv")
+    df_test.plot(filters_to_plot=["original"])
+    df_test.plot(filters_to_plot=["original", "median"])  
+    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(1200, 1500))  
     df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(1200, 1500))
 
     # Test data
