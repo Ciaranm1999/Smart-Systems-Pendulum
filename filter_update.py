@@ -23,7 +23,7 @@ class KalmanFilter:
 
 class DataFilter:
     def __init__(self, file_path, column_name, alpha=0.3, kernel_size=31,
-                 kalman_process_var=1e-8, kalman_measurement_var=1e-3):
+                 kalman_process_var=1e-4, kalman_measurement_var=1e-2):
         self.file_path = file_path
         self.column_name = column_name
         self.alpha = alpha
@@ -37,8 +37,8 @@ class DataFilter:
 
     def load_data(self):
         df = pd.read_csv(self.file_path)
-        self.data = df[self.column_name].values
-        self.time = df['time'].values if 'time' in df.columns else np.arange(len(df))
+        self.data = df[self.column_name][:1500].values
+        self.time = df['time'][:1500].values if 'time' in df.columns else np.arange(len(df))
 
         return df
 
@@ -95,9 +95,7 @@ class DataFilter:
             print(f"  {key.upper()}: MSE = {vals['MSE']:.4f}, RMSE = {vals['RMSE']:.4f}")
         return metrics
 
-
-
-    def plot(self, filters_to_plot=["original", "ema", "median", "kalman"]):
+    def plot(self, filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=None):
         # Dictionary to map names to the actual data
         filter_data = {
             "original": self.original,
@@ -114,17 +112,24 @@ class DataFilter:
             "kalman": {"label": "Kalman", "style": ":"}
         }
 
+        # Determine range
+        if range_to_plot is not None:
+            start, end = range_to_plot
+        else:
+            start, end = 0, len(self.original)
+
         plt.figure(figsize=(12, 6))
         for key in filters_to_plot:
             if key in filter_data:
                 plt.plot(
-                    filter_data[key],
+                    self.time[start:end],
+                    filter_data[key][start:end],
                     linestyle=styles.get(key, {}).get("style", "-"),
                     alpha=styles.get(key, {}).get("alpha", 1.0),
                     label=styles.get(key, {}).get("label", key.capitalize())
                 )
         plt.title(f"Filtered Plot: {', '.join([f.capitalize() for f in filters_to_plot])}")
-        plt.xlabel("Sample Index")
+        plt.xlabel("Time" if hasattr(self, "time") else "Sample Index")
         plt.ylabel("Value")
         plt.legend()
         plt.grid(True)
@@ -132,8 +137,21 @@ class DataFilter:
         plt.show()
 
 
+
+
 if __name__ == "__main__":
 
+
+ # Test data
+    df_test = DataFilter("data_points_free_fall_40Hz - Copy.csv", column_name="xAccl", alpha=0.3, kernel_size=11,
+                kalman_process_var=1e-5, kalman_measurement_var=1e-4) ##5-4:ok // 
+    df_test.load_data()
+    df_test.apply_filters()
+    df_test.compute_error_metrics()
+    df_test.save_filtered_data("filtered_free_fall_output.csv")
+    # df_test.plot(filters_to_plot=["original", "median"])  
+    # df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(1200, 1500))  
+    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(1200, 1500))
 
     # Test data
     df_test = DataFilter("test_data.csv", column_name="theta", alpha=0.04, kernel_size=41) ##0.05
@@ -143,7 +161,7 @@ if __name__ == "__main__":
     # df_test.save_filtered_data("filtered_test_output.csv")
     # df_test.plot(filters_to_plot=["original", "ema"])  
     # df_test.plot(filters_to_plot=["ema", "median"])
-    df_test.plot(filters_to_plot=["original", "kalman"])  
+    # df_test.plot(filters_to_plot=["original", "kalman"])  
 
     # Sensor data
     # df_sensor = DataFilter("sensor_data.csv", column_name="xAccl", alpha=0.4, kernel_size=11)
