@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import medfilt
+from scipy.signal import medfilt, butter, filtfilt
 from sklearn.metrics import mean_squared_error
 
 
@@ -87,7 +87,7 @@ class DataFilter:
             "original": self.original,
             "ema": self.ema,
             "median": self.median,
-            "kalman": self.kalman_filtered
+            "kalman": self.kalman_filtered,
         })
         df_filtered.to_csv(output_path, index=False)
         print(f"Filtered data saved to: {output_path}")
@@ -112,13 +112,12 @@ class DataFilter:
     def plot(self, filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=None):
         # Dictionary to map names to the actual data
         filter_data = {
-            key: self.to_radians(val) for key, val in {
-                "original": self.original,
-                "ema": self.ema,
-                "median": self.median,
-                "kalman": self.kalman_filtered
-            }.items()
+            "original": self.original,
+            "ema": self.ema,
+            "median": self.median,
+            "kalman": self.kalman_filtered,
         }
+
 
 
         # Labels and line styles
@@ -126,7 +125,7 @@ class DataFilter:
             "original": {"label": "Original", "style": "-", "alpha": 0.5},
             "ema": {"label": "EMA", "style": "--"},
             "median": {"label": "Median", "style": "-."},
-            "kalman": {"label": "Kalman", "style": ":"}
+            "kalman": {"label": "Kalman", "style": ":"},
         }
 
         # Determine range
@@ -165,7 +164,6 @@ if __name__ == "__main__":
     df_test.load_data(start=0, end=1500)
     df_test.apply_filters()
     df_test.compute_error_metrics()
-
     # df_test.save_filtered_data("filtered_free_fall_output.csv")
     # df_test.plot(filters_to_plot=["original"])
     df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(200, 500))  
