@@ -175,28 +175,3 @@ if __name__ == "__main__":
     # df_data_3.apply_filters()
     # df_data_3.plot(filters_to_plot=["original","ema"])
 
-    # best_alpha = None
-    # best_score = float('inf')
-    # alpha_values = np.linspace(0.01, 0.99, 50)
-
-    # results = []
-
-    # for alpha in alpha_values:
-    #     df_test = DataFilter("test_data.csv", column_name="theta", alpha=alpha, kernel_size=41)
-    #     df_test.load_data()
-    #     df_test.apply_filters()
-
-    #     # Evaluate smoothness: variance of first difference (proxy for noise)
-    #     derivative = np.diff(df_test.ema)
-    #     smoothness = np.var(derivative)
-
-    #     # Optional: also compare to original signal with MSE (not great if original is noisy)
-    #     # mse = mean_squared_error(df_test.original, df_test.ema)
-
-    #     results.append((alpha, smoothness))
-
-    #     if smoothness < best_score:
-    #         best_score = smoothness
-    #         best_alpha = alpha
-
-    # print(f"Best alpha (by smoothness): {best_alpha:.3f} with score {best_score:.6f}")
