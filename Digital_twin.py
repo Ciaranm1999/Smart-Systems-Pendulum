@@ -46,7 +46,7 @@ class DigitalTwin:
         self.K_t = hp.MOTOR_K_t  # Torque Constant (Nm/A)
         self.K_e = hp.MOTOR_K_e  # Back EMF Constant (V/(rad/s)) - Often numerically equal to K_t in SI
         self.J = hp.MOTOR_J  # Rotor Inertia (kg.m^2)
-        self.b = hp.MOTOR_B  # Viscous Friction Coefficient (Nm.s/rad)
+        self.B = hp.MOTOR_B  # Viscous Friction Coefficient (Nm.s/rad)
         self.pully_circumference = hp.PULLY_RADIUS * 2 * np.pi  # Circumference of the pulley (m)
         self.pully_radius = hp.PULLY_RADIUS  # Circumference of the pulley (m)
         self.current_omega = 0.0  # Initial angular velocity (rad/s)
@@ -241,7 +241,7 @@ class DigitalTwin:
             angular_acceleration = self.motor_model_dynamics(
                 applied_voltage,
                 self.current_omega, # Use omega from the beginning of the timestep
-                self.R, self.K_t, self.K_e, self.J, self.b
+                self.R, self.K_t, self.K_e, self.J, self.B
             )
             linear_acceleration = angular_acceleration * self.pully_radius
             # Store the calculated acceleration for this step

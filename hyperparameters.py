@@ -14,9 +14,9 @@ class hyperparameters:
 
     # motor class
     MOTOR_R =7  # Resistance in ohms
-    MOTOR_K_t = 0.00375 * MOTOR_R  /2# Torque constant in Nm/A
-    MOTOR_K_e = 0.00375 * MOTOR_R  /2# Back EMF constant in V/(rad/s)
-    MOTOR_J = 9e-5  # Rotor inertia in kg.m^2
+    MOTOR_K_t = 0.0325 # Torque constant in Nm/A
+    MOTOR_K_e = 0.0325 # Back EMF constant in V/(rad/s)
+    MOTOR_J = 4e-4  # Rotor inertia in kg.m^2
     MOTOR_B = 1e-6  # Viscous friction coefficient in Nm.s/rad
     MOTOR_V_MAX = 12.0  # Maximum voltage in volt
     PULLY_RADIUS = 0.005 # 1 cm
