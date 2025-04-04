@@ -16,7 +16,6 @@ except ImportError:
 
 from Digital_twin import DigitalTwin # Assuming this exists, though it's less used in the vectorized version
 
-
 hp = hyperparameters()
 
 # Path to the CSV file
@@ -29,7 +28,7 @@ start_time = 0
 end_time = start_time + 30 * sample_rate
 
 highlighted_data = df[start_time:end_time]
-highlighted_data['low-pass_filtered'] += 8 # Adjusted for the offset
+highlighted_data.loc[:, 'low-pass_filtered'] += 8 # Adjusted for the offset
 
 # Plot highlighted_data['time'] and highlighted_data['xAccl']
 plt.figure(figsize=(10, 6))
@@ -44,14 +43,6 @@ plt.show()
 #%%
 # Ensure time is relative and in seconds
 df_time_pd = (highlighted_data['time'] - highlighted_data['time'].iloc[0]) / 1_000_000
-
-# Apply a moving average filter to the 'xAccl' column
-window_size = 11  # Define the window size for the moving average
-# df_theta_filtered_pd = highlighted_data['ema'].rolling(window=window_size).mean()
-
-# Drop NaNs introduced by rolling window and reset index
-# df_theta_filtered_pd = df_theta_filtered_pd.iloc[window_size - 1:].reset_index(drop=True)
-# df_time_pd = df_time_pd.iloc[window_size - 1:].reset_index(drop=True)
 
 # Sensor properties
 sensor_max = 1024
@@ -72,10 +63,6 @@ df_time = xp.asarray(df_time_pd.values, dtype=xp.float64) # Keep time for plotti
 # Using pandas before converting to xp array is simpler here
 average_time_diff = df_time_pd.diff().mean()
 print("Average time difference between samples:", average_time_diff)
-# Using xp after conversion:
-# average_time_diff_xp = xp.mean(xp.diff(df_time))
-# print("Average time difference (xp):", average_time_diff_xp)
-
 
 ######################
 # 3.3: FIND THE INITIAL CONDITIONS
@@ -92,17 +79,10 @@ delta_t = average_time_diff # Use the actual average time step from data
 print(f"Using delta_t: {delta_t}")
 sim_steps = len(df_theta_radians)
 
-# AIR_FRICTION = 0.00014789579158316633  # Coefficient of air friction
-#     COLOUMB_FRICTION = 0.00809619238476954
 # Define the parameter ranges for the grid search
 c_air_range_np = np.linspace(0.000, 0.001, 100, dtype=np.float64)  # High resolution grid
 c_c_range_np = np.linspace(0.000, 0.01, 100, dtype=np.float64)   # High resolution grid
 l_range_np = np.linspace(0.230, 0.235, 50, dtype=np.float64) # Single value for l
-# l_range_np = np.array([0.24], dtype=np.float64) # Single value for l
-    # 0.0006,
-    # 0.0042,
-    # 0.238,  # Use the best l found
-
 
 # --- Create parameter grid on GPU/CPU using xp ---
 c_air_grid, c_c_grid, l_grid = xp.meshgrid(
@@ -163,12 +143,6 @@ def simulate_potential_model_vectorized(theta_init, theta_dot_init, c_air_flat, 
     theta = xp.full(num_combinations, theta_init, dtype=xp.float64)
     theta_dot = xp.full(num_combinations, theta_dot_init, dtype=xp.float64)
 
-    # Array to store simulation results (optional, can calculate error incrementally)
-    # Shape: (num_combinations, num_steps)
-    # This can consume a lot of memory for large grids/long simulations!
-    # sim_measurements_all = xp.zeros((num_combinations, num_steps), dtype=xp.float64)
-
-    # Alternative: Calculate sum of squared errors incrementally
     sum_sq_errors = xp.zeros(num_combinations, dtype=xp.float64)
 
     for i in range(num_steps):
@@ -189,12 +163,6 @@ def simulate_potential_model_vectorized(theta_init, theta_dot_init, c_air_flat, 
     mean_sq_error = sum_sq_errors / num_steps
     rmse_values = xp.sqrt(mean_sq_error)
 
-    # If storing all results, calculate RMSE like this:
-    # # Expand measurements to match the shape of sim_measurements_all for broadcasting
-    # # theta_measurements_expanded = xp.expand_dims(theta_measurements, axis=0) # Shape (1, num_steps)
-    # # errors = sim_measurements_all - theta_measurements_expanded # Broadcasting happens here
-    # # rmse_values = xp.sqrt(xp.mean(errors**2, axis=1)) # Mean across time (axis=1)
-
     # Find the index of the minimum error
     min_error_idx = xp.argmin(rmse_values)
 
@@ -210,7 +178,6 @@ def simulate_potential_model_vectorized(theta_init, theta_dot_init, c_air_flat, 
     best_sim_measurements,_ = run_single_simulation(theta_init, theta_dot_init, best_c_air, best_c_c, best_l, num_steps, delta_t, m, g)
 
     return lowest_error, (best_c_air, best_c_c, best_l), best_sim_measurements
-
 
 def run_single_simulation(theta_init, theta_dot_init, c_air, c_c, l, num_steps, delta_t, m, g):
     """ Runs a single simulation, returns the theta trajectory (using NumPy/CPU is fine here) """
@@ -234,7 +201,7 @@ def run_single_simulation(theta_init, theta_dot_init, c_air, c_c, l, num_steps, 
         theta_dot += theta_double_dot * delta_t
         theta += theta_dot * delta_t
         sim_meas[i] = theta
-        sum_sq_errors += (theta - df_theta_radians_np[i])**2
+        sum_sq_errors += (theta - df_theta_radians[i])**2
 
     mean_sq_error = sum_sq_errors / num_steps
     rmse_values = xp.sqrt(mean_sq_error)
@@ -276,9 +243,6 @@ else:
     df_theta_radians_np = df_theta_radians
     # sim_measurements_best is already NumPy array
 
-# Simulate with original estimated parameters for comparison (optional)
-# err_estimated, estimated_measurements = simulate_potential_model(theta, theta_dot, hp.AIR_FRICTION, hp.COLOUMB_FRICTION, best_params[2], df_theta_radians)
-# print("Estimated Error:", err_estimated)
 #%%
 
 first_estimate, error = run_single_simulation(
