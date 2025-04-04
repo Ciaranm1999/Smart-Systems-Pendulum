@@ -81,33 +81,71 @@ class DataFilter:
             self.median.append(med)
             self.kalman_filtered.append(kalman_val)
     
-    def save_filtered_data(self, output_path="filtered_output.csv"):
-        df_filtered = pd.DataFrame({
-            "time": self.time,
-            "original": self.original,
-            "ema": self.ema,
-            "median": self.median,
-            "kalman": self.kalman_filtered,
-        })
+    def save_filtered_data(self, output_path="filtered_output.csv", in_radians=False):
+        if in_radians:
+            data_to_save = {
+                "time": self.time,
+                "original": self.to_radians(self.original),
+                "ema": self.to_radians(self.ema),
+                "median": self.to_radians(self.median),
+                "kalman": self.to_radians(self.kalman_filtered),
+            }
+        else:
+            data_to_save = {
+                "time": self.time,
+                "original": self.original,
+                "ema": self.ema,
+                "median": self.median,
+                "kalman": self.kalman_filtered,
+            }
+
+        df_filtered = pd.DataFrame(data_to_save)
         df_filtered.to_csv(output_path, index=False)
-        print(f"Filtered data saved to: {output_path}")
+        print(f"Filtered data {'(in radians)' if in_radians else ''} saved to: {output_path}")
 
-    def compute_error_metrics(self):
 
+    def compute_error_metrics(self, reference="original", simulated_theta=None):
+        """
+        Compute RMSE and MSE of filtered data against a reference.
+        
+        Parameters:
+            reference (str): 'original' or 'simulated'
+            simulated_theta (array-like): Required if reference is 'simulated'
+        """
         metrics = {}
-        for label, filtered in {
-            "ema": self.ema,
-            "median": self.median,
-            "kalman": self.kalman_filtered
-        }.items():
-            mse = mean_squared_error(self.original, filtered)
-            rmse = np.sqrt(mse)
-            metrics[label] = {"MSE": mse, "RMSE": rmse}
 
-        print("Error Metrics (vs. Original):")
+        if reference == "simulated":
+            if simulated_theta is None:
+                raise ValueError("You must provide 'simulated_theta' when reference is 'simulated'.")
+            reference_data = np.array(simulated_theta)
+            label = "Simulated Theta"
+        else:
+            reference_data = np.array(self.original)
+            label = "Original Data"
+
+        # Convert filtered outputs to radians
+        filtered_signals = {
+            "ema": self.to_radians(self.ema),
+            "median": self.to_radians(self.median),
+            "kalman": self.to_radians(self.kalman_filtered)
+        }
+
+        # Truncate to match reference data length
+        min_len = min(len(reference_data), *[len(f) for f in filtered_signals.values()])
+        reference_data = reference_data[:min_len]
+
+        for name, signal in filtered_signals.items():
+            signal = signal[:min_len]
+            mse = mean_squared_error(reference_data, signal)
+            rmse = np.sqrt(mse)
+            metrics[name] = {"MSE": mse, "RMSE": rmse}
+
+        print(f"\nError Metrics vs {label}:")
         for key, vals in metrics.items():
-            print(f"  {key.upper()}: MSE = {vals['MSE']:.4f}, RMSE = {vals['RMSE']:.4f}")
+            print(f"  {key.upper()}: MSE = {vals['MSE']:.6f}, RMSE = {vals['RMSE']:.6f}")
+
         return metrics
+
 
     def plot(self, filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=None):
         # Dictionary to map names to the actual data
@@ -122,10 +160,10 @@ class DataFilter:
 
         # Labels and line styles
         styles = {
-            "original": {"label": "Original", "style": "-", "alpha": 0.5},
+            "original": {"label": "Original", "style": "-", "alpha": 0.5, "color": "black"},
             "ema": {"label": "EMA", "style": "--"},
             "median": {"label": "Median", "style": "-."},
-            "kalman": {"label": "Kalman", "style": ":"},
+            "kalman": {"label": "Kalman", "style": "-."},
         }
 
         # Determine range
@@ -157,43 +195,61 @@ class DataFilter:
 
 if __name__ == "__main__":
 
+    df_sim = pd.read_csv("theta_history.csv")
+    theta_history = df_sim['Theta'].values[:1235]
 
  # Test data
     df_test = DataFilter("data_points_free_fall_40Hz - Copy.csv", column_name="xAccl", alpha=0.4, kernel_size=11,
                 kalman_process_var=1e-5, kalman_measurement_var=1e-4) ##5-4:ok //  alpha=0.4, kernel_size=11
     df_test.load_data(start=0, end=1500)
     df_test.apply_filters()
-    df_test.compute_error_metrics()
-    # df_test.save_filtered_data("filtered_free_fall_output.csv")
+    df_test.save_filtered_data("filtered_free_fall_output-radians.csv", in_radians=True)
+    df_test.compute_error_metrics(reference="simulated", simulated_theta=theta_history) # Calculate RMSE and MSE against simulated data
+
     # df_test.plot(filters_to_plot=["original"])
-    df_test.plot(filters_to_plot=["original", "ema"], range_to_plot=(0, 500))  
-    df_test.plot(filters_to_plot=["original", "median"], range_to_plot=(0, 500))  
-    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(0, 500))
-
-
-    # Test data
-    # df_test = DataFilter("test_data.csv", column_name="theta", alpha=0.04, kernel_size=41) ##0.05
-    # df_test.load_data()
-    # df_test.apply_filters()
-    # df_test.compute_error_metrics()
-    # df_test.save_filtered_data("filtered_test_output.csv")
-    # df_test.plot(filters_to_plot=["original", "ema"])  
-    # df_test.plot(filters_to_plot=["ema", "median"])
-    # df_test.plot(filters_to_plot=["original", "kalman"])  
-
-    # Sensor data
-    # df_sensor = DataFilter("sensor_data.csv", column_name="xAccl", alpha=0.4, kernel_size=11)
-    # df_sensor.load_data()
-    # df_sensor.apply_filters()
-    # df_sensor.save_filtered_data("filtered_sensor_output.csv")
-    # df_sensor.plot(filters_to_plot=["original", "ema"])
-
-    # df_data_3 = DataFilter("sensor_data_300ms.csv", column_name="xAccl", alpha=0.35, kernel_size=41)
-    # df_data_3.load_data()
-    # df_data_3.apply_filters()
-    # df_data_3.plot(filters_to_plot=["original","ema"])
+    df_test.plot(filters_to_plot=["original", "ema", "median", "kalman"], range_to_plot=(300, 400)) 
+    # df_test.plot(filters_to_plot=["original", "median"])  
+    # df_test.plot(filters_to_plot=["original", "kalman"])
 
 
 
-## do FFT on the signal and plot the spectrum to find the noise frequency of the original signal
+    # # --- Plot Simulated and Filtered Data ---
+    # min_len = min(len(theta_history), len(df_test.kalman_filtered))
+    # theta_history = theta_history[:min_len]
+    # kalman_radians = df_test.to_radians(df_test.kalman_filtered[:min_len])
+    # ema_radians = df_test.to_radians(df_test.ema[:min_len])
+    # median_radians = df_test.to_radians(df_test.median[:min_len])
+    # time_axis = df_test.time[:min_len]
 
+    # # Plot Simulated vs Kalman
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(time_axis, theta_history, label="Simulated Theta", linestyle="-", alpha=0.7)
+    # plt.plot(time_axis, kalman_radians, label="Kalman Filtered", linestyle="--")
+    # plt.title("Simulated vs Kalman Filtered")
+    # plt.xlabel("Time")
+    # plt.ylabel("Theta (radians)")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(time_axis, theta_history, label="Simulated Theta", linestyle="-", alpha=0.7)
+    # plt.plot(time_axis, ema_radians, label="EMA Filtered", linestyle="--")
+    # plt.title("Simulated vs EMA Filtered")
+    # plt.xlabel("Time")
+    # plt.ylabel("Theta (radians)")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(time_axis, theta_history, label="Simulated Theta", linestyle="-", alpha=0.7)
+    # plt.plot(time_axis, median_radians, label="Median Filtered", linestyle="--")
+    # plt.title("Simulated vs Median Filtered")
+    # plt.xlabel("Time")
+    # plt.ylabel("Theta (radians)")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+
+    # plt.show()
