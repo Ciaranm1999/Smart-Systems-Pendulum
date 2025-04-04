@@ -1,6 +1,6 @@
 #%%
 import numpy as np
-from Digital_twin import DigitalTwin
+
 import pandas as pd
 import matplotlib.pyplot as plt
 from hyperparameters import hyperparameters
@@ -79,15 +79,13 @@ theta, theta_dot = find_initial_state(df_theta_radians)
 
 #should be the same as your recording, sim_time is equal to total time of the recording
 
-delta_t = 0.025
+delta_t = 1/sample_rate 
 sim_time = 0.
-digital_twin = DigitalTwin()
-digital_twin.delta_t = delta_t
 
 # Define the ranges for each parameter and the 'resolution' of the search space
-c_air_range = np.linspace(0.00, 0.01, 500)  # Example range for c_air
-c_c_range = np.linspace(0.0, 0.001, 500)    # Example range for c_c
-l_range = [0.25]    
+c_air_range = np.linspace(0.00, 0.01, 50)  # Example range for c_air
+c_c_range = np.linspace(0.0, 0.001, 50)    # Example range for c_c
+l_range = [0.24]    
 
 
 def get_theta_double_dot(theta, theta_dot, l, m, c_air, c_c, g=hp.GRAVITY):
@@ -114,9 +112,6 @@ def get_theta_double_dot(theta, theta_dot, l, m, c_air, c_c, g=hp.GRAVITY):
         return theta_double_dot
 
 def simulate_potential_model(theta, theta_dot, c_air, c_c, l, theta_measurements):
-     digital_twin.c_air =c_air
-     digital_twin.c_c = c_c
-     digital_twin.l = l
      sim_measurements = []
      for i in range(len(theta_measurements)):
         theta_double_dot = get_theta_double_dot(theta, theta_dot, l, hp.PENDULUM_MASS, c_air, c_c)

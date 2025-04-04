@@ -20,24 +20,38 @@ from Digital_twin import DigitalTwin # Assuming this exists, though it's less us
 hp = hyperparameters()
 
 # Path to the CSV file
-csv_file_path = 'data_points_free_fall_40Hz.csv'
+csv_file_path = 'filtered_low-pass_data-units.csv'
 df = pd.read_csv(csv_file_path)
 
 sample_rate = 40  # Hz
-start_time = int(round(7.67 * sample_rate))
-end_time = start_time + 15 * sample_rate
+start_time = 0
+# start_time = int(round(7.67 * sample_rate))
+end_time = start_time + 30 * sample_rate
 
 highlighted_data = df[start_time:end_time]
+highlighted_data['low-pass_filtered'] += 8 # Adjusted for the offset
+
+# Plot highlighted_data['time'] and highlighted_data['xAccl']
+plt.figure(figsize=(10, 6))
+plt.plot(highlighted_data['time'], highlighted_data['low-pass_filtered'], label='xAccl', color='blue')
+plt.xlabel('Time (microseconds)')
+plt.ylabel('xAccl')
+plt.title('Highlighted Data: Time vs xAccl')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#%%
 # Ensure time is relative and in seconds
 df_time_pd = (highlighted_data['time'] - highlighted_data['time'].iloc[0]) / 1_000_000
 
 # Apply a moving average filter to the 'xAccl' column
-window_size = 5  # Define the window size for the moving average
-df_theta_filtered_pd = highlighted_data['xAccl'].rolling(window=window_size).mean()
+window_size = 11  # Define the window size for the moving average
+# df_theta_filtered_pd = highlighted_data['ema'].rolling(window=window_size).mean()
 
 # Drop NaNs introduced by rolling window and reset index
-df_theta_filtered_pd = df_theta_filtered_pd.iloc[window_size - 1:].reset_index(drop=True)
-df_time_pd = df_time_pd.iloc[window_size - 1:].reset_index(drop=True)
+# df_theta_filtered_pd = df_theta_filtered_pd.iloc[window_size - 1:].reset_index(drop=True)
+# df_time_pd = df_time_pd.iloc[window_size - 1:].reset_index(drop=True)
 
 # Sensor properties
 sensor_max = 1024
@@ -48,7 +62,7 @@ sensor_range = sensor_max - sensor_min
 # 3.1: THE SENSOR DATA IS TRANSFORMED TO RADIANS
 ######################
 offset_radians = 0.022
-df_theta_radians_pd = (df_theta_filtered_pd - sensor_min) * (np.pi / sensor_range) - 0.5 * np.pi - offset_radians
+df_theta_radians_pd = (highlighted_data['low-pass_filtered'] - sensor_min) * (np.pi / sensor_range) - 0.5 * np.pi - offset_radians
 
 # --- Convert relevant data to NumPy/CuPy arrays ---
 df_theta_radians = xp.asarray(df_theta_radians_pd.values, dtype=xp.float64)
@@ -78,10 +92,17 @@ delta_t = average_time_diff # Use the actual average time step from data
 print(f"Using delta_t: {delta_t}")
 sim_steps = len(df_theta_radians)
 
+# AIR_FRICTION = 0.00014789579158316633  # Coefficient of air friction
+#     COLOUMB_FRICTION = 0.00809619238476954
 # Define the parameter ranges for the grid search
-c_air_range_np = np.linspace(0.00, 0.005, 100, dtype=np.float64)  # High resolution grid
-c_c_range_np = np.linspace(0.0, 0.02, 50, dtype=np.float64)   # High resolution grid
-l_range_np = np.linspace(0.1, 0.25, 500, dtype=np.float64) # Single value for l
+c_air_range_np = np.linspace(0.000, 0.001, 100, dtype=np.float64)  # High resolution grid
+c_c_range_np = np.linspace(0.000, 0.01, 100, dtype=np.float64)   # High resolution grid
+l_range_np = np.linspace(0.230, 0.235, 50, dtype=np.float64) # Single value for l
+# l_range_np = np.array([0.24], dtype=np.float64) # Single value for l
+    # 0.0006,
+    # 0.0042,
+    # 0.238,  # Use the best l found
+
 
 # --- Create parameter grid on GPU/CPU using xp ---
 c_air_grid, c_c_grid, l_grid = xp.meshgrid(
@@ -128,7 +149,7 @@ def get_theta_double_dot_vectorized(theta, theta_dot, l, m, c_air, c_c, g):
 
     # Total angular acceleration
     theta_double_dot = gravity_torque + coulomb_friction + air_friction
-
+    
     return theta_double_dot
 
 def simulate_potential_model_vectorized(theta_init, theta_dot_init, c_air_flat, c_c_flat, l_flat, theta_measurements, delta_t, m, g):
@@ -186,7 +207,7 @@ def simulate_potential_model_vectorized(theta_init, theta_dot_init, c_air_flat, 
     # For plotting the best simulation later, we need its trajectory.
     # We can either re-simulate with best params, or extract if sim_measurements_all was stored.
     # Re-simulating is often easier and less memory intensive:
-    best_sim_measurements = run_single_simulation(theta_init, theta_dot_init, best_c_air, best_c_c, best_l, num_steps, delta_t, m, g)
+    best_sim_measurements,_ = run_single_simulation(theta_init, theta_dot_init, best_c_air, best_c_c, best_l, num_steps, delta_t, m, g)
 
     return lowest_error, (best_c_air, best_c_c, best_l), best_sim_measurements
 
@@ -200,7 +221,7 @@ def run_single_simulation(theta_init, theta_dot_init, c_air, c_c, l, num_steps, 
     # Ensure parameters are scalar numpy types for this function if needed
     l_s, m_s, c_air_s, c_c_s, g_s = map(float, (l, m, c_air, c_c, g))
 
-
+    sum_sq_errors = 0
     for i in range(num_steps):
          # Using a non-vectorized numpy version for single sim clarity
          # Or adapt get_theta_double_dot_vectorized to handle scalars
@@ -213,8 +234,12 @@ def run_single_simulation(theta_init, theta_dot_init, c_air, c_c, l, num_steps, 
         theta_dot += theta_double_dot * delta_t
         theta += theta_dot * delta_t
         sim_meas[i] = theta
+        sum_sq_errors += (theta - df_theta_radians_np[i])**2
 
-    return sim_meas
+    mean_sq_error = sum_sq_errors / num_steps
+    rmse_values = xp.sqrt(mean_sq_error)
+
+    return sim_meas, rmse_values
 
 # --- Run the vectorized simulation and parameter search ---
 print("Starting vectorized grid search...")
@@ -254,12 +279,39 @@ else:
 # Simulate with original estimated parameters for comparison (optional)
 # err_estimated, estimated_measurements = simulate_potential_model(theta, theta_dot, hp.AIR_FRICTION, hp.COLOUMB_FRICTION, best_params[2], df_theta_radians)
 # print("Estimated Error:", err_estimated)
+#%%
 
-
+first_estimate, error = run_single_simulation(
+    theta_init,
+    theta_dot_init,
+    0.0004564646464646465,
+    0.0071535353535353,
+    0.2358244897959183,  # Use the best l found
+    sim_steps,
+    delta_t,
+    m_const,
+    g_const
+)
+starting = 25*40
+ending = starting+5*40
+print("First Estimate Error:", error)
 # Plot the simulated measurements and the actual measurements
 plt.figure(figsize=(12, 7))
+plt.plot(df_time_np[starting:ending], df_theta_radians_np[starting:ending], label='Actual Measurements', color='blue', linewidth=1.5)
+# plt.plot(df_time_np[starting:ending], sim_measurements_best[starting:ending], label=f'Simulated (Best Params: c_air={best_params[0]:.5f}, c_c={best_params[1]:.5f})', color='green', linestyle='--', linewidth=1.5)
+plt.plot(df_time_np[starting:ending], first_estimate[starting:ending], label=f'Simulated (First Estimate)', color='red', linestyle='--', linewidth=1.5)
+# plt.plot(df_time.iloc[window_size - 1:].reset_index(drop=True), estimated_measurements, label='Estimated Measurements', color='orange', linestyle='--')
+plt.xlabel('Time (s)')
+plt.ylabel('Theta (radians)')
+plt.title('Comparison of Simulated (Best Fit) and Actual Measurements')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(12, 7))
 plt.plot(df_time_np, df_theta_radians_np, label='Actual Measurements', color='blue', linewidth=1.5)
-plt.plot(df_time_np, sim_measurements_best, label=f'Simulated (Best Params: c_air={best_params[0]:.5f}, c_c={best_params[1]:.5f})', color='red', linestyle='--', linewidth=1.5)
+# plt.plot(df_time_np, sim_measurements_best, label=f'Simulated (Best Params: c_air={best_params[0]:.5f}, c_c={best_params[1]:.5f})', color='green', linestyle='--', linewidth=1.5)
+plt.plot(df_time_np, first_estimate, label=f'Simulated (First Estimate)', color='red', linestyle='--', linewidth=1.5)
 # plt.plot(df_time.iloc[window_size - 1:].reset_index(drop=True), estimated_measurements, label='Estimated Measurements', color='orange', linestyle='--')
 plt.xlabel('Time (s)')
 plt.ylabel('Theta (radians)')
