@@ -1,10 +1,11 @@
+# %%
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 # Load the test data
-csv_file_path = 'filtered_free_fall_output.csv'
+csv_file_path = 'filtered_low-pass_data-units.csv'
 data = pd.read_csv(csv_file_path)
 
 # Convert time to relative seconds and scale to seconds
@@ -13,10 +14,10 @@ data['time_seconds'] = (data['time'] - data['time'].iloc[0]) / 1e6
 # Pendulum parameters
 m = 0.3  # Mass of the pendulum (kg)
 g = 9.81  # Acceleration due to gravity (m/s^2)
-l = 0.24  # Length of the pendulum (m)
+l = 0.35  # Length of the pendulum (m)
 
 # Convert theta from degrees to radians and normalize
-data['theta_radians'] = np.radians(data['ema'])
+data['theta_radians'] = np.radians(data['low-pass_filtered'])
 data['theta_radians'] = data['theta_radians'] / data['theta_radians'].max() * np.pi
 
 # Calculate angular velocity (theta_dot) numerically
@@ -38,11 +39,25 @@ def exponential_decay(t, a, b, c):
 # Filter steady-state data (t > 6)
 steady_state_data = data[data['time_seconds'] > 6]
 
+# Filter steady-state data (t > 6)
+steady_state_data = data[data['time_seconds'] > 6]
+
+# Remove rows with NaN or inf values in 'TE' or 'time_seconds'
+steady_state_data = steady_state_data[np.isfinite(steady_state_data['TE']) & np.isfinite(steady_state_data['time_seconds'])]
+
+# Provide initial guesses for the parameters
+initial_guesses = [steady_state_data['TE'].max() - steady_state_data['TE'].min(), 0.1, steady_state_data['TE'].min()]
+
+# Fit the exponential decay function to the Total Energy (TE)
+popt, pcov = curve_fit(exponential_decay, steady_state_data['time_seconds'], steady_state_data['TE'], p0=initial_guesses)
+
 # Provide initial guesses for the parameters
 initial_guesses = [steady_state_data['TE'].max() - steady_state_data['TE'].min(), 0.1, steady_state_data['TE'].min()]
 
 # Filter data to start at time_seconds > 6
 filtered_data = data[data['time_seconds'] > 6]
+
+# %%
 
 # Plot Angular Displacement Over Time (starting at time > 6)
 plt.figure(figsize=(12, 6))
@@ -54,17 +69,22 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
+# %%
+
 # Plot PE, KE, and TE Over Time (starting at time > 6)
 plt.figure(figsize=(12, 6))
 plt.plot(filtered_data['time_seconds'], filtered_data['KE'], label='Kinetic Energy (KE)', color='blue')
 plt.plot(filtered_data['time_seconds'], filtered_data['PE'], label='Potential Energy (PE)', color='red')
 plt.plot(filtered_data['time_seconds'], filtered_data['TE'], label='Total Energy (TE)', color='green')
+#plt.xlim(7,15)
 plt.xlabel('Time (s)')
 plt.ylabel('Energy (J)')
 plt.title('Kinetic, Potential, and Total Energy Over Time (t > 6)')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+# %%
 
 # Fit the exponential decay function to the Total Energy (TE)
 popt, pcov = curve_fit(exponential_decay, steady_state_data['time_seconds'], steady_state_data['TE'], p0=initial_guesses)
@@ -116,3 +136,4 @@ print(f"Coefficient of air friction (gamma): {coefficient_air_friction:.4f} kg/s
 # Calculate the coefficient of Coulomb friction (mu)
 coefficient_coulomb_friction = average_coulomb_loss / (m * g * l)
 print(f"Coefficient of Coulomb friction (mu): {coefficient_coulomb_friction:.4f}")
+ds
