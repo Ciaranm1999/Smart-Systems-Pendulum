@@ -1,13 +1,13 @@
 class hyperparameters:
     # Digital twin
-    DELTA_T  = 0.025  # Time step for the simulation in seconds
+    DELTA_T  = 0.01  # Time step for the simulation in seconds
     GRAVITY = 9.81  # m/s^2, acceleration due to gravity
-    PENDULUM_LENGHT = 0.237  # Length of the pendulum in meters
+    PENDULUM_LENGHT = 0.2358244897959183  # Length of the pendulum in meters
     PENDULUM_MASS = 0.3  # kg, mass of the pendulum bob
     PENDULUM_MOTOR_FORCE_MULTIPLIER = 2.5  # Multiplier for the motor force
-    
-    AIR_FRICTION = 0.00014789579158316633  # Coefficient of air friction
-    COLOUMB_FRICTION = 0.00809619238476954  # Coefficient of Coulomb friction
+
+    AIR_FRICTION = 0.0004564646464646465  # Coefficient of air friction
+    COLOUMB_FRICTION = 0.0071535353535353  # Coefficient of Coulomb friction
     # 0.0007374749498997996, 0.005070140280561123, 0.23240816326530614
     TRACK_LENGTH = 0.27 # Length of the track in meters
     TRACK_DRAW_LENGTH = 250 # Length of the track in pixels

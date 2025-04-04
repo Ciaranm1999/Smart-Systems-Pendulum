@@ -369,7 +369,7 @@ class DigitalTwin:
         screen = pygame.display.get_surface()  # Get the current display surface
         screen.blit(fps_text, (screen.get_width() - 100, 10))
         pygame.display.flip()
-        self.clock.tick(40) 
+        self.clock.tick(1/hp.DELTA_T) 
     def check_prediction_lists(self):
         if len(self.future_motor_accelerations) == 0:
             self.future_motor_accelerations = [0]
