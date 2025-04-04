@@ -4,55 +4,42 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from hyperparameters import hyperparameters
+
 hp = hyperparameters()
 
 # Path to the CSV file
-csv_file_path = 'data_points_free_fall_40Hz.csv'
+csv_file_path = 'filtered_low-pass_data-units.csv'
 df = pd.read_csv(csv_file_path)
 
 
 sample_rate = 40  # Hz
-start_time = int(round(7.67 * sample_rate))
-end_time = start_time + 10 * sample_rate
+start_time = int(round(0 * sample_rate))
+end_time = start_time + 30 * sample_rate
 # start_time = int(round(70*50))
 # end_time = start_time + 1 * 50
 
 highlighted_data = df[start_time:end_time]
 df_time = (highlighted_data['time'] - highlighted_data['time'].iloc[0]) /1_000_000
-df_theta = highlighted_data['xAccl']
+df_theta = highlighted_data['low-pass_filtered']
 # Apply a moving average filter to the 'theta' column
 window_size = 5  # Define the window size for the moving average
 
 # Calculate the average difference between samples in df_time
 average_time_diff = df_time.diff().mean()
 print("Average time difference between samples:", average_time_diff)
-#######################
-# 3.2: THE DATA IS FILTERED
-#######################
-df_theta_filtered = highlighted_data['xAccl'].rolling(window=window_size).mean()
 
-sensor_max = 1024 # Assuming this is by design
-sensor_min = -1024
-sensor_range = sensor_max - sensor_min
 
 ######################
 # 3.1: THE SENSOR DATA IS TRANSFORMED TO RADIANS
 ######################
-
+sensor_max = 1024 # Assuming this is by design
+sensor_min = -1024
+sensor_range = sensor_max - sensor_min
 # Convert sensor values to radians
 offset_radians = 0.022
-df_theta_radians = (df_theta_filtered - sensor_min) * (np.pi / sensor_range) - 0.5 * np.pi - offset_radians
-df_theta_radians = df_theta_radians.iloc[window_size - 1:].reset_index(drop=True)
-# df_time = df_time.iloc[window_size - 1:].reset_index(drop=True)
-# Plot the filtered theta values against the time column
-# plt.figure(figsize=(10, 6))
-# plt.plot(df_time, df_theta_radians, label='xAccl')
-# plt.xlabel('Time (s)')
-# plt.ylabel('xAccl')
-# plt.title('xAccl vs Time')
-# plt.legend()
-# plt.grid()
-# plt.show()
+df_theta_radians = (df_theta - sensor_min) * (np.pi / sensor_range) - 0.5 * np.pi - offset_radians
+
+
 
 ######################
 # 3.3: FIND THE INITIAL CONDITIONS
@@ -71,7 +58,7 @@ def find_initial_state(df_theta):
      #      print(df_theta.iloc[i + 1] - df_theta.iloc[i])
 
      theta = df_theta.iloc[0]  # Initial angle in radians
-     theta_dot = 0.1
+     theta_dot = 0.0
      return theta, theta_dot
 
 #Initial conditions based on the recorded data
@@ -95,7 +82,6 @@ def get_theta_double_dot(theta, theta_dot, l, m, c_air, c_c, g=hp.GRAVITY):
         - Coulomb friction
         - Air friction
         """
-     
         
         # Gravity contribution
         gravity_torque = -(g * np.sin(theta)) / l
@@ -138,8 +124,6 @@ for c_air in c_air_range:
                     lowest_error = error
                     # print(error, "found a better error")
                     best_params = (c_air, c_c, l)
-     index+=1
-     print(f'Finished {index * 10} iterations')
 
 print("Best Parameters:", best_params)
 print("Lowest Error:", lowest_error)
@@ -151,8 +135,8 @@ print("Estimated Error:", err_estimated)
 print("Simulated Error:", err_simulated)
 # Plot the simulated measurements and the actual measurements
 plt.figure(figsize=(10, 6))
-plt.plot(df_time.iloc[window_size - 1:].reset_index(drop=True), df_theta_radians, label='Actual Measurements', color='blue')
-plt.plot(df_time.iloc[window_size - 1:].reset_index(drop=True), sim_measurements, label='Simulated Measurements', color='red', linestyle='--')
+plt.plot(df_time, df_theta_radians, label='Actual Measurements', color='blue')
+plt.plot(df_time, sim_measurements, label='Simulated Measurements', color='red', linestyle='--')
 # plt.plot(df_time.iloc[window_size - 1:].reset_index(drop=True), estimated_measurements, label='Estimated Measurements', color='orange', linestyle='--')
 plt.xlabel('Time (s)')
 plt.ylabel('Theta (radians)')
