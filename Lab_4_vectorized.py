@@ -42,12 +42,13 @@ class InvertedPendulumGA:
         self.action_resolution = simulation_duration / (num_actions + 1)
         # self.digital_twin = DigitalTwin()
         self.population_size = population_size
-        self.parent_pool_size = 20
+        self.parent_pool_size = 50
         self.num_actions = num_actions
         self.simulation_duration = simulation_duration
         self.action_resolution = action_resolution
         self.simulation_delta_t = simulation_delta_t
         self.simulation_steps = int(simulation_duration / simulation_delta_t)
+        self.max_simulation_steps = int(simulation_duration / simulation_delta_t)
         self.num_steps = int(simulation_duration / action_resolution)
         self.step_resolution = int(action_resolution / simulation_delta_t)
         
@@ -109,7 +110,9 @@ class InvertedPendulumGA:
                 return -100
         return max_score
 
-    def evaluate_population(self, pool):
+    def evaluate_population(self, pool, steps):
+        
+        self.dt_config['simulation_steps'] = int(steps)
         args_list = [(individual, self.dt_config) for individual in self.population]
         fitness_scores = pool.map(worker_simulate, args_list)
         return fitness_scores
@@ -155,8 +158,8 @@ class InvertedPendulumGA:
              individual[mask] = np.random.randint(1, self.num_actions, size=num_mutations)
         return individual
 
-    def run_generation(self, pool, num_elites=2):
-        fitness_scores = self.evaluate_population(pool) # Pass pool
+    def run_generation(self, pool, num_elites=15, steps=500):
+        fitness_scores = self.evaluate_population(pool, steps) # Pass pool
 
         # --- Elitism: Select best individuals directly ---
         # Ensure we handle potential failures (-100) if using that flag
@@ -214,7 +217,7 @@ class InvertedPendulumGA:
 
              # Replenish parent pool if it gets low and we still need individuals
             if len(parents_pool) < 2 and len(new_population) < self.population_size:
-                 print("Replenishing parent pool for crossover.")
+                #  print("Replenishing parent pool for crossover.")
                  # Option: Re-use selected parents, or re-select based on scores
                  parents_pool.extend(self.select_parents(fitness_scores)) # Re-select (might be inefficient)
                  np.random.shuffle(parents_pool)
@@ -229,15 +232,20 @@ class InvertedPendulumGA:
         num_processes = max(1, os.cpu_count() - 1) if os.cpu_count() else 1
         print(f"Using {num_processes} worker processes.")
 
+        min_value = 500
+        max_value = self.max_simulation_steps
+        delta = max_value - min_value
+
         with multiprocessing.Pool(processes=num_processes) as pool:
             best_overall_fitness = -np.inf # Assuming lower is better (e.g., min angle)
             best_overall_solution = None
 
             for i in range(num_generations):
-                self.run_generation(pool) # Pass the existing pool
+                proposed_simulation_steps = (delta/num_generations) * (i) + min_value
+                self.run_generation(pool, steps=proposed_simulation_steps) # Pass the existing pool                
 
                 # Evaluate the new population to find the best of this generation
-                current_fitness_scores = self.evaluate_population(pool)
+                current_fitness_scores = self.evaluate_population(pool, proposed_simulation_steps)
                 valid_scores = [s for s in current_fitness_scores if s != -100]
 
                 if not valid_scores:
@@ -250,30 +258,13 @@ class InvertedPendulumGA:
                      best_gen_index = current_fitness_scores.index(current_best_fitness)
                      best_gen_solution = self.population[best_gen_index]
 
-                print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
+                print(f"Generation: {i}, Best Fitness: {current_best_fitness}, proposed_steps: {proposed_simulation_steps}")
 
                 # Update overall best if this generation is better
                 if current_best_fitness > best_overall_fitness:
                     best_overall_fitness = current_best_fitness
                     best_overall_solution = best_gen_solution
-
-                # Check threshold (adjust comparison if higher fitness is better)
-                # Original code used >= threshold, implying higher is better. Let's stick to that.
-                # Need to redefine fitness: maybe 1 / (1 + max_score) or similar?
-                # Assuming the goal IS to minimize max_score (angle).
-                # Let's redefine the threshold check. If max angle should be BELOW threshold:
-                # fitness_threshold = 0.1 # Example: aim for max angle < 0.1 radians
-                # if best_overall_fitness < fitness_threshold:
-                #     print(f"Stopping early: Individual found with fitness {best_overall_fitness} meeting the threshold {fitness_threshold} at generation {i}.")
-                #     # Need to close the pool properly when breaking early
-                #     pool.close()
-                #     pool.join()
-                #     return best_overall_solution
-
-                # If using original threshold logic (higher score = better, like survival time)
-                # Adapt fitness calculation and comparison accordingly.
-                # Sticking to MINIMIZING max_score for now. Adjust if needed.
-
+                    print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
 
             print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
             return best_overall_solution # Return the best solution found across all generations
@@ -283,16 +274,16 @@ class InvertedPendulumGA:
          self.population[0] = np.array(elite)
          self.evaluate_population(pool) # Need to evaluate to update scores if needed by selection
 if __name__ == '__main__':
-    ga = InvertedPendulumGA(population_size=50, # <--- INCREASED
+    ga = InvertedPendulumGA(population_size=200,
                             num_actions=9, # Check if this matches action_map size/logic
-                            simulation_duration=6,
-                            action_resolution=0.4,
+                            simulation_duration=10,
+                            action_resolution=0.5,
                             simulation_delta_t=hp.DELTA_T)
 
     start_time = time.time()
     # Threshold likely needs adjustment based on fitness definition
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
-    best_solution = ga.optimize(num_generations=1000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
+    best_solution = ga.optimize(num_generations=20_000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
 
     print(f"Optimization took {end_time - start_time:.2f} seconds.")
