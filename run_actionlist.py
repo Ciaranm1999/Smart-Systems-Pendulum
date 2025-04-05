@@ -1,7 +1,7 @@
 import time
 import pygame
 from Digital_twin import DigitalTwin
-import numpy as np
+
 # Before starting run pip install -r requirements.txt
 
 digital_twin = DigitalTwin()
@@ -13,7 +13,6 @@ if __name__=='__main__':
         # Can also use your keyboard to manually control the system.
 
         actions =  [ 4, 5, 8, 2, 5, 6, 4, 8, 6, 7, 2, 6, 1, 7, 3, 7, 3, 7, 4, 7, 3, 8, 4, 7, 7, 3, 5, 4, 7, 4, 8, 7, 2, 6, 4, 8, 4, 6, 6, 3 ]
-        # actions = list(np.load("best_actions.npy"))
         test = 0.5
         steps_time = test / digital_twin.delta_t
         #digital_twin.connect_device()
