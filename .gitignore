@@ -6,3 +6,4 @@ backup/*
 recordings/*
 replays/*
 best_actions/*
+.DS_Store
