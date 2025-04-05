@@ -283,11 +283,15 @@ if __name__ == '__main__':
     start_time = time.time()
     # Threshold likely needs adjustment based on fitness definition
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
-    best_solution = ga.optimize(num_generations=10_000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
+    best_solution, best_fitness = ga.optimize(num_generations=10, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
-    
+
     actions = list(best_solution)  # Ensure it's a list, not a numpy array
-    np.save("best_actions.npy", best_solution)
+    actions.append(best_fitness)  # Append the best fitness score to the solution
+
+    folder_path = "./best_actions"
+    file_count = len([name for name in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, name))])
+    np.save(f"{folder_path}/best_actions_{file_count}.npy", best_solution)
 
     print(f"Optimization took {end_time - start_time:.2f} seconds.")
 
