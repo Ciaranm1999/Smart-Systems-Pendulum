@@ -18,7 +18,7 @@ def worker_simulate(args):
     digital_twin.theta_dot = 0.0
     digital_twin.x_pivot = 0.0
     digital_twin.steps = 0.0 # Assuming this is simulation steps count
-    max_score = 0.0
+    max_score = -np.inf
 
     # Use necessary parameters from dt_config
     simulation_steps = dt_config['simulation_steps']
@@ -32,7 +32,7 @@ def worker_simulate(args):
             digital_twin.perform_action(direction, duration)
 
         theta, theta_dot, x_pivot = digital_twin.step()
-        max_score = max(max_score, abs(theta))
+        max_score = max(max_score, -abs(theta - np.pi))
         if abs(digital_twin.x_pivot) > 0.135: # Use local digital_twin
              return -100 # Use a distinct failure value if needed
     return max_score
@@ -96,7 +96,7 @@ class InvertedPendulumGA:
         self.digital_twin.theta_dot = 0.0
         self.digital_twin.x_pivot = 0.0
         self.digital_twin.steps = 0.0
-        max_score = 0.0
+        max_score = -np.inf
 
         for step in range(self.simulation_steps):
             if step % self.step_resolution == 0 and step // self.step_resolution < len(actions):
@@ -104,7 +104,7 @@ class InvertedPendulumGA:
                 direction, duration = self.digital_twin.action_map[action]
                 self.digital_twin.perform_action(direction, duration)
             theta, theta_dot, x_pivot = self.digital_twin.step()
-            max_score = max(max_score, abs(theta))
+            max_score = max(max_score, -abs(theta - np.pi))
             if abs(self.digital_twin.x_pivot) > 0.135:
                 return -100
         return max_score
@@ -226,7 +226,7 @@ class InvertedPendulumGA:
         print(f"Using {num_processes} worker processes.")
 
         with multiprocessing.Pool(processes=num_processes) as pool:
-            best_overall_fitness = 0 # Assuming lower is better (e.g., min angle)
+            best_overall_fitness = -np.inf # Assuming lower is better (e.g., min angle)
             best_overall_solution = None
 
             for i in range(num_generations):
@@ -238,7 +238,7 @@ class InvertedPendulumGA:
 
                 if not valid_scores:
                      print(f"Generation {i}: All individuals failed.")
-                     current_best_fitness = float('inf') # Or handle as error
+                     current_best_fitness = -np.inf  # Initialize to negative infinity
                      best_gen_solution = None
                 else:
                      # Find best fitness in this generation (assuming lower is better)
