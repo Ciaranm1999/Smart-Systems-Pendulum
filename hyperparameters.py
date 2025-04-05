@@ -23,4 +23,4 @@ class hyperparameters:
 
     range_encoder = 163
 
-    RENDER = False
+    RENDER = True
