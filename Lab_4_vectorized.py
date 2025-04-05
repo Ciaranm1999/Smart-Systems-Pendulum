@@ -285,6 +285,9 @@ if __name__ == '__main__':
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
     best_solution = ga.optimize(num_generations=20_000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
+    
+    actions = list(best_solution)  # Ensure it's a list, not a numpy array
+    np.save("best_actions.npy", best_solution)
 
     print(f"Optimization took {end_time - start_time:.2f} seconds.")
 
