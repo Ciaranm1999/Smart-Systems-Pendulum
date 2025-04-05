@@ -267,7 +267,7 @@ class InvertedPendulumGA:
                     print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
 
             print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
-            return best_overall_solution # Return the best solution found across all generations
+            return best_overall_solution, current_best_fitness # Return the best solution found across all generations
 
     # inject_elite needs adaptation if evaluate_population now requires a pool
     def inject_elite(self, elite, pool): # Requires pool
