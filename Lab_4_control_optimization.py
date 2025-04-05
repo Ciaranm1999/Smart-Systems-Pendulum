@@ -2,12 +2,15 @@ import numpy as np
 import random
 import time
 from Digital_twin import DigitalTwin
+from hyperparameters import hyperparameters
+hp = hyperparameters()
 
 class InvertedPendulumGA:
     def __init__(self, population_size, num_actions, simulation_duration, action_resolution, simulation_delta_t):
+        action_resolution = simulation_duration / (num_actions + 1)
         self.digital_twin = DigitalTwin()
         self.population_size = population_size
-        self.parent_pool_size = 4 #parent_pool_size
+        self.parent_pool_size = 20 #parent_pool_size
         self.num_actions = num_actions
         self.simulation_duration = simulation_duration
         self.action_resolution = action_resolution
@@ -98,15 +101,18 @@ class InvertedPendulumGA:
                 individual[i] = random.randint(0, self.num_actions - 1)
         return individual
 
-    def run_generation(self):
+    def run_generation(self, num_elites=2):
         """Run a single generation of the genetic algorithm, using all parents in the pool to create offspring."""
         fitness_scores = self.evaluate_population()
         parents_pool = self.select_parents(fitness_scores)
         
+        new_population = []
+        for i in range(num_elites):
+            elite_index = parents_pool[-(i + 1)]  # Select the best individuals as elites
+            new_population.append(elite_index) 
+
         # Shuffle the parents pool to randomize pairings
         np.random.shuffle(parents_pool)
-        
-        new_population = []
         while len(new_population) < self.population_size:
             for i in range(0, len(parents_pool), 2):
                 # Break the loop if the new population is already filled
@@ -152,10 +158,14 @@ class InvertedPendulumGA:
         print(f"No individual met the fitness threshold. Best fitness after {num_generations} generations is {best_fitness}.")
         return self.population[best_index]
 
-
+    def inject_elite(self, elite):
+        self.population[0] = np.array(elite)
+        self.evaluate_population()
+        
 # Example usage
-ga = InvertedPendulumGA(population_size=50, num_actions=9, simulation_duration=2, action_resolution=0.2, simulation_delta_t=0.005)
-best_solution = ga.optimize(num_generations=10000 , fitness_threshold=np.pi)
+ga = InvertedPendulumGA(population_size=50, num_actions=9, simulation_duration=6, action_resolution=0.4, simulation_delta_t=hp.DELTA_T)
+# ga.inject_elite([4, 8, 4, 8, 6, 4, 8, 4, 8, 7])
+best_solution = ga.optimize(num_generations=1000 , fitness_threshold=np.pi)
 
-print("Best Solution:", best_solution)
+print("Best Solution:", ", ".join(map(str, best_solution)))
 
