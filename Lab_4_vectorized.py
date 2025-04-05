@@ -139,8 +139,12 @@ class InvertedPendulumGA:
         return [self.population[i] for i in top_performers_original_indices]
 
     def crossover(self, parent1, parent2):
-        crossover_point = random.randint(1, self.num_steps - 1)
-        offspring = np.concatenate([parent1[:crossover_point], parent2[crossover_point:]])
+        crossover_points = sorted(random.sample(range(1, self.num_steps), 2))
+        offspring = np.concatenate([
+            parent1[:crossover_points[0]],
+            parent2[crossover_points[0]:crossover_points[1]],
+            parent1[crossover_points[1]:]
+        ])
         return offspring
 
     def mutate(self, individual, mutation_rate=0.3):
