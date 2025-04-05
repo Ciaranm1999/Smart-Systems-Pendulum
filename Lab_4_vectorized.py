@@ -258,7 +258,7 @@ class InvertedPendulumGA:
                      best_gen_index = current_fitness_scores.index(current_best_fitness)
                      best_gen_solution = self.population[best_gen_index]
 
-                print(f"Generation: {i}, Best Fitness: {current_best_fitness}, proposed_steps: {proposed_simulation_steps}")
+                # print(f"Generation: {i}, Best Fitness: {current_best_fitness}, proposed_steps: {proposed_simulation_steps}")
 
                 # Update overall best if this generation is better
                 if current_best_fitness > best_overall_fitness:
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     start_time = time.time()
     # Threshold likely needs adjustment based on fitness definition
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
-    best_solution = ga.optimize(num_generations=20_000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
+    best_solution = ga.optimize(num_generations=10_000, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
     
     actions = list(best_solution)  # Ensure it's a list, not a numpy array

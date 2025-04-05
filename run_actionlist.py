@@ -19,6 +19,11 @@ if __name__=='__main__':
 
         test = 0.5
         steps_time = test / digital_twin.delta_t
+        # actions =  [7, 2, 0, 4, 7, 5, 3, 8, 4, 0]
+        # actions=[3, 7, 2, 6, 1, 6, 2, 4, 2, 6, 2, 8, 4, 8, 4, 8, 4, 8, 4, 7]
+        # actions = [8, 4, 5, 5, 3, 2, 6, 6, 7, 5, 5, 3, 7, 4, 8, 4, 8, 4, 8, 4, 8, 4, 1, 8, 1, 7, 4, 8, 4, 2, 3, 2, 8, 4, 2, 8, 1, 6, 6, 6] #-1.0815428753827656.
+        # actions =  [ 4, 5, 8, 2, 5, 6, 4, 8, 6, 7, 2, 6, 1, 7, 3, 7, 3, 7, 4, 7, 3, 8, 4, 7, 7, 3, 5, 4, 7, 4, 8, 7, 2, 6, 4, 8, 4, 6, 6, 3 ]
+        
         #digital_twin.connect_device()
         #digital_twin.start_recording("test_data_3")
         while running:

@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 
 digital_twin = DigitalTwin()
 theta_history = []
+
+press_history = []
+
 if __name__=='__main__':
     running = True
     while running:
@@ -23,6 +26,8 @@ if __name__=='__main__':
                 if event.key in digital_twin.actions:
                     direction, duration = digital_twin.actions[event.key]
                     digital_twin.perform_action(direction, duration)
+
+                    press_history.append([event.key, digital_twin.steps])
                 elif event.key == pygame.K_r:
                     digital_twin = DigitalTwin()  # Restart the system
                     print("System restarted")
@@ -37,3 +42,5 @@ if __name__=='__main__':
     plt.title('Pendulum Angle Over Time')
     plt.grid()
     plt.show()
+
+    print("Press history:", press_history)
