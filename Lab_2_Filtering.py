@@ -194,7 +194,6 @@ if __name__ == "__main__":
     theta_history = df_sim['Theta'].values[:1235]
 
  # Test data
-    df_test = DataFilter("data_points_free_fall_40Hz - Copy copy.csv", column_name="xAccl", alpha=0.4, kernel_size=11,
     df_test = DataFilter("data_points_free_fall_40Hz.csv", column_name="xAccl", alpha=0.4, kernel_size=11,
                 kalman_process_var=1e-5, kalman_measurement_var=1e-4) 
     df_test.load_data(start=0, end=1500) # CHANGE START TO 265 TO MATCH THE SIMULATED DATA
