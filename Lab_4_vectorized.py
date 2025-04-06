@@ -55,8 +55,9 @@ class InvertedPendulumGA:
         self.max_simulation_steps = int(simulation_duration / simulation_delta_t)
         self.num_steps = int(simulation_duration / action_resolution)
         self.step_resolution = int(action_resolution / simulation_delta_t)
-        self. print_output = print_output
-        temp_dt = DigitalTwin() # Create temporarily to get action_map
+        self.print_output = print_output
+        self.critical_segment_length = 40  # Add this parameter
+        temp_dt = DigitalTwin()  # Create temporarily to get action_map
         self.dt_config = {
             'simulation_steps': self.simulation_steps,
             'step_resolution': self.step_resolution,
