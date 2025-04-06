@@ -1,3 +1,4 @@
+#%%
 import numpy as np
 import random
 import time
@@ -5,6 +6,8 @@ import multiprocessing
 from Digital_twin_simplified import DigitalTwin
 from hyperparameters import hyperparameters
 import os
+import matplotlib.pyplot as plt
+    
 hp = hyperparameters()
 
 def worker_simulate(args):
@@ -38,11 +41,12 @@ def worker_simulate(args):
     return max_score
 
 class InvertedPendulumGA:
-    def __init__(self, population_size, num_actions, simulation_duration, action_resolution, simulation_delta_t):
+    def __init__(self, population_size, num_actions, simulation_duration, action_resolution, simulation_delta_t, parent_pool_size=50, elite_size=15, print_output=True):
         self.action_resolution = simulation_duration / (num_actions + 1)
         # self.digital_twin = DigitalTwin()
         self.population_size = population_size
-        self.parent_pool_size = 50
+        self.parent_pool_size = parent_pool_size
+        self.elite_size = elite_size
         self.num_actions = num_actions
         self.simulation_duration = simulation_duration
         self.action_resolution = action_resolution
@@ -51,7 +55,7 @@ class InvertedPendulumGA:
         self.max_simulation_steps = int(simulation_duration / simulation_delta_t)
         self.num_steps = int(simulation_duration / action_resolution)
         self.step_resolution = int(action_resolution / simulation_delta_t)
-        
+        self. print_output = print_output
         temp_dt = DigitalTwin() # Create temporarily to get action_map
         self.dt_config = {
             'simulation_steps': self.simulation_steps,
@@ -92,27 +96,9 @@ class InvertedPendulumGA:
 
         return actions
 
-    def simulate(self, actions):
-        self.digital_twin.theta = 0.0
-        self.digital_twin.theta_dot = 0.0
-        self.digital_twin.x_pivot = 0.0
-        self.digital_twin.steps = 0.0
-        max_score = -np.inf
-
-        for step in range(self.simulation_steps):
-            if step % self.step_resolution == 0 and step // self.step_resolution < len(actions):
-                action = actions[step // self.step_resolution]
-                direction, duration = self.digital_twin.action_map[action]
-                self.digital_twin.perform_action(direction, duration)
-            theta, theta_dot, x_pivot = self.digital_twin.step()
-            max_score = max(max_score, -abs(theta - np.pi))
-            if abs(self.digital_twin.x_pivot) > 0.135:
-                return -100
-        return max_score
-
     def evaluate_population(self, pool, steps):
         
-        self.dt_config['simulation_steps'] = int(steps)
+        self.dt_config['simulation_steps'] = self.max_simulation_steps #int(steps)
         args_list = [(individual, self.dt_config) for individual in self.population]
         fitness_scores = pool.map(worker_simulate, args_list)
         return fitness_scores
@@ -124,7 +110,8 @@ class InvertedPendulumGA:
         valid_population = [self.population[i] for i in valid_indices]
 
         if not valid_scores: # Handle case where all simulations failed
-            print("Warning: All individuals failed simulation in parent selection.")
+            if self.print_output:
+                print("Warning: All individuals failed simulation.")
             # Fallback: maybe select randomly or return empty list?
             # For now, just selecting from the original population randomly might be a fallback
             indices = np.random.choice(len(self.population), self.parent_pool_size, replace=False)
@@ -158,15 +145,16 @@ class InvertedPendulumGA:
              individual[mask] = np.random.randint(1, self.num_actions, size=num_mutations)
         return individual
 
-    def run_generation(self, pool, num_elites=15, steps=500):
-        fitness_scores = self.evaluate_population(pool, steps) # Pass pool
+    def run_generation(self, pool, num_elites=15, steps=500, fitness_scores=None):
+        # fitness_scores = self.evaluate_population(pool, steps) # Pass pool
 
         # --- Elitism: Select best individuals directly ---
         # Ensure we handle potential failures (-100) if using that flag
         valid_fitness_indices = [(i, score) for i, score in enumerate(fitness_scores) if score != -100]
 
         if not valid_fitness_indices:
-            print("Warning: No valid individuals in generation for elitism/selection.")
+            if self.print_output:
+                print("Warning: All individuals failed simulation.")
             # Handle this case: maybe generate a new random population?
             # For now, let's skip elitism and selection if all failed.
             parents_pool = [self.create_individual() for _ in range(self.population_size)] # Fallback
@@ -182,8 +170,9 @@ class InvertedPendulumGA:
             # Use the selection method on all fitness scores (it should handle failures)
             parents_pool = self.select_parents(fitness_scores)
             if not parents_pool: # Handle empty parent pool if select_parents has issues
-                 print("Warning: Parent pool is empty. Using random individuals.")
-                 parents_pool = [self.create_individual() for _ in range(self.population_size)]
+                if self.print_output:
+                    print("Warning: Parent pool is empty. Using random individuals.")
+                parents_pool = [self.create_individual() for _ in range(self.population_size)]
 
 
         # --- Create New Population ---
@@ -194,7 +183,8 @@ class InvertedPendulumGA:
             # Ensure there are enough parents for crossover
             if len(parents_pool) < 2:
                 # Not enough parents, fill remainder with mutated elites or randoms
-                print("Warning: Not enough parents for crossover. Filling population.")
+                if self.print_output:
+                    print("Warning: Not enough parents for crossover. Filling population.")
                 fill_count = self.population_size - len(new_population)
                 for _ in range(fill_count):
                     if elites: # Mutate an elite if possible
@@ -217,10 +207,11 @@ class InvertedPendulumGA:
 
              # Replenish parent pool if it gets low and we still need individuals
             if len(parents_pool) < 2 and len(new_population) < self.population_size:
-                #  print("Replenishing parent pool for crossover.")
+                if self.print_output:
+                    print("Replenishing parent pool for crossover.")
                  # Option: Re-use selected parents, or re-select based on scores
-                 parents_pool.extend(self.select_parents(fitness_scores)) # Re-select (might be inefficient)
-                 np.random.shuffle(parents_pool)
+                parents_pool.extend(self.select_parents(fitness_scores)) # Re-select (might be inefficient)
+                np.random.shuffle(parents_pool)
 
 
         self.population = new_population[:self.population_size]
@@ -230,7 +221,8 @@ class InvertedPendulumGA:
         # Create the pool *outside* the loop
         # Determine number of processes (adjust as needed)
         num_processes = max(1, os.cpu_count() - 1) if os.cpu_count() else 1
-        print(f"Using {num_processes} worker processes.")
+        if self.print_output:
+            print(f"Using {num_processes} worker processes.")
 
         min_value = 500
         max_value = self.max_simulation_steps
@@ -239,17 +231,19 @@ class InvertedPendulumGA:
         with multiprocessing.Pool(processes=num_processes) as pool:
             best_overall_fitness = -np.inf # Assuming lower is better (e.g., min angle)
             best_overall_solution = None
-
+            fitness_history = []
+            current_fitness_scores = self.evaluate_population(pool, 500)
             for i in range(num_generations):
                 proposed_simulation_steps = (delta/num_generations) * (i) + min_value
-                self.run_generation(pool, steps=proposed_simulation_steps) # Pass the existing pool                
+                self.run_generation(pool, steps=proposed_simulation_steps, fitness_scores=current_fitness_scores) # Pass the existing pool                
 
                 # Evaluate the new population to find the best of this generation
                 current_fitness_scores = self.evaluate_population(pool, proposed_simulation_steps)
                 valid_scores = [s for s in current_fitness_scores if s != -100]
 
                 if not valid_scores:
-                     print(f"Generation {i}: All individuals failed.")
+                     if self.print_output:
+                          print(f"Generation {i}: All individuals failed.")
                      current_best_fitness = -np.inf  # Initialize to negative infinity
                      best_gen_solution = None
                 else:
@@ -264,26 +258,33 @@ class InvertedPendulumGA:
                 if current_best_fitness > best_overall_fitness:
                     best_overall_fitness = current_best_fitness
                     best_overall_solution = best_gen_solution
-                    print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
-
-            print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
-            return best_overall_solution, current_best_fitness # Return the best solution found across all generations
+                    if self.print_output:
+                        print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
+                    fitness_history.append([current_best_fitness, i])
+            if self.print_output:
+                print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
+            return best_overall_solution, current_best_fitness, fitness_history # Return the best solution found across all generations
 
     # inject_elite needs adaptation if evaluate_population now requires a pool
     def inject_elite(self, elite, pool): # Requires pool
          self.population[0] = np.array(elite)
          self.evaluate_population(pool) # Need to evaluate to update scores if needed by selection
-if __name__ == '__main__':
-    ga = InvertedPendulumGA(population_size=200,
+
+#%%
+def run_simulation(num_generation, population_size, parent_pool, elites, simulation_duration=10, action_resolution=0.5, print_output=True):
+    ga = InvertedPendulumGA(population_size=population_size,
                             num_actions=9, # Check if this matches action_map size/logic
-                            simulation_duration=10,
-                            action_resolution=0.5,
-                            simulation_delta_t=hp.DELTA_T)
+                            simulation_duration=simulation_duration,
+                            action_resolution=action_resolution,
+                            simulation_delta_t=hp.DELTA_T,
+                            parent_pool_size=parent_pool,
+                            elite_size=elites,
+                            print_output=print_output)
 
     start_time = time.time()
     # Threshold likely needs adjustment based on fitness definition
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
-    best_solution, best_fitness = ga.optimize(num_generations=10, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
+    best_solution, best_fitness, fitness_history = ga.optimize(num_generations=num_generation, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
 
     actions = list(best_solution)  # Ensure it's a list, not a numpy array
@@ -299,3 +300,26 @@ if __name__ == '__main__':
          print("Best Solution:", ", ".join(map(str, best_solution)))
     else:
          print("No solution met the criteria or all simulations failed.")
+
+    return best_solution, best_fitness, fitness_history
+
+if __name__ == '__main__':
+    _,_, fitness_history = run_simulation( num_generation=1000,
+                population_size=200,
+                parent_pool=50,
+                elites=15,
+                simulation_duration=10,
+                action_resolution=0.5,
+                print_output=False)
+    
+    # Plotting the fitness history
+    x_values = [entry[1] for entry in fitness_history]
+    y_values = [entry[0] for entry in fitness_history]
+
+    plt.plot(x_values, y_values, marker='o')
+    plt.xlabel('Generation')
+    plt.ylabel('Best Fitness')
+    plt.title('Fitness History Over Generations')
+    plt.grid(True)
+    plt.show()
+# %%
