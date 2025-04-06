@@ -69,30 +69,39 @@ class InvertedPendulumGA:
         # print(fitness_scores, "at start")
 
     def create_individual(self):
+
+        action_to_distance = {            
+            8: 0.10395276894801612,     # ;
+            7: 0.046038796770503654,    # l
+            6: 0.014913007558438687,    # k
+            5: 0.00235862223393408,     # j
+            4: -0.10395276894801612,    # a 
+            3: -0.046038796770503654,   # s
+            2: -0.014913007558438687,   # d
+            1: -0.00235862223393408,    # f
+            0: 0.0
+        }
         actions = np.zeros(self.num_steps, dtype=int)
-        action_map = self.dt_config['action_map']
+        action_map = action_to_distance #self.dt_config['action_map']
         net_movement = 0
-        for i in range(self.num_steps):
+        i=0
+        while i < self.num_steps:
             # Your logic for choosing action
-            if abs(net_movement) < 100:
+            if abs(net_movement) < hp.TRACK_LENGTH:
                action = np.random.randint(1, self.num_actions) # Assuming action indices are 1 to num_actions-1
-            elif net_movement >= 100:
+            elif net_movement >= hp.TRACK_LENGTH:
                action = np.random.choice([1, 2, 3, 4]) # Example action indices
             else: # net_movement <= -100
                action = np.random.choice([5, 6, 7, 8]) # Example action indices
 
             actions[i] = action
-            # Update net_movement based on the chosen action and action_map
-            # This logic needs careful checking based on how action_map is structured
-            if action in [1, 2, 3, 4]: # Example condition
-                # Assume action_map keys match these indices
-                if action in action_map:
-                    net_movement -= action_map[action][1] # Assuming [1] is movement magnitude
-            elif action in [5, 6, 7, 8]: # Example condition
-                # Adjust index if needed for action_map lookup (e.g., action - 4)
-                adjusted_action_key = action # Or adjust as necessary
-                if adjusted_action_key in action_map:
-                     net_movement += action_map[adjusted_action_key][1]
+            if action in action_map:
+                # Update net_movement based on the action chosen
+                # Assuming action_map returns a distance or change in position
+                net_movement += action_map[action]
+            i += 1
+            if abs(net_movement) > hp.TRACK_LENGTH:
+                i -=1
 
         return actions
 
