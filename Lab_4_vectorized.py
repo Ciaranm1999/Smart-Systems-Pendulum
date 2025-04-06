@@ -21,7 +21,7 @@ def worker_simulate(args):
     digital_twin.theta_dot = 0.0
     digital_twin.x_pivot = 0.0
     digital_twin.steps = 0.0 # Assuming this is simulation steps count
-    max_score = -np.inf
+    max_score = 0
 
     # Use necessary parameters from dt_config
     simulation_steps = dt_config['simulation_steps']
@@ -35,7 +35,7 @@ def worker_simulate(args):
             digital_twin.perform_action(direction, duration)
 
         theta, theta_dot, x_pivot = digital_twin.step()
-        max_score = max(max_score, -abs(theta - np.pi))
+        max_score += -abs(theta - np.pi)/simulation_steps
         if abs(digital_twin.x_pivot) > 0.135: # Use local digital_twin
              return -100 # Use a distinct failure value if needed
     return max_score
@@ -56,7 +56,7 @@ class InvertedPendulumGA:
         self.num_steps = int(simulation_duration / action_resolution)
         self.step_resolution = int(action_resolution / simulation_delta_t)
         self.print_output = print_output
-        self.critical_segment_length = 40  # Add this parameter
+        self.critical_segment_length = 25  # Add this parameter
         temp_dt = DigitalTwin()  # Create temporarily to get action_map
         self.dt_config = {
             'simulation_steps': self.simulation_steps,
@@ -108,7 +108,7 @@ class InvertedPendulumGA:
 
     def evaluate_population(self, pool, steps):
         
-        self.dt_config['simulation_steps'] = self.max_simulation_steps #int(steps)
+        self.dt_config['simulation_steps'] = int(steps) #self.max_simulation_steps #int(steps)
         args_list = [(individual, self.dt_config) for individual in self.population]
         fitness_scores = pool.map(worker_simulate, args_list)
         return fitness_scores
@@ -160,7 +160,7 @@ class InvertedPendulumGA:
         offspring = np.concatenate([start_segment, middle_segment, end_segment])
         return offspring
 
-    def mutate(self, individual, mutation_rate=0.3):
+    def mutate(self, individual, mutation_rate=0.1):
         mask = np.random.rand(self.num_steps) < mutation_rate
          # Ensure mutation generates valid action indices (e.g., 1 to num_actions-1)
         num_mutations = np.sum(mask)
@@ -253,11 +253,11 @@ class InvertedPendulumGA:
 
         with multiprocessing.Pool(processes=num_processes) as pool:
             best_overall_fitness = -np.inf # Assuming lower is better (e.g., min angle)
-            best_overall_solution = None
+            best_overall_solution = []
             fitness_history = []
             current_fitness_scores = self.evaluate_population(pool, 500)
             for i in range(num_generations):
-                proposed_simulation_steps = (delta/num_generations) * (i) + min_value
+                proposed_simulation_steps = (delta/num_generations) * (i + 1) + min_value
                 self.run_generation(pool, steps=proposed_simulation_steps, fitness_scores=current_fitness_scores) # Pass the existing pool                
 
                 # Evaluate the new population to find the best of this generation
@@ -281,8 +281,7 @@ class InvertedPendulumGA:
                 if current_best_fitness > best_overall_fitness:
                     best_overall_fitness = current_best_fitness
                     best_overall_solution = best_gen_solution
-                    if self.print_output:
-                        print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
+                    print(f"Generation: {i}, Best Fitness: {current_best_fitness}")
                     fitness_history.append([current_best_fitness, i])
             if self.print_output:
                 print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
@@ -309,7 +308,8 @@ def run_simulation(num_generation, population_size, parent_pool, elites, simulat
     # If minimizing max angle, threshold should be small (e.g., 0.05 radians)
     best_solution, best_fitness, fitness_history = ga.optimize(num_generations=num_generation, fitness_threshold=np.pi) # <--- INCREASED Generations, ADJUSTED Threshold
     end_time = time.time()
-
+    if best_solution is None:
+        best_solution = []
     actions = list(best_solution)  # Ensure it's a list, not a numpy array
     actions.append(best_fitness)  # Append the best fitness score to the solution
 
@@ -327,12 +327,12 @@ def run_simulation(num_generation, population_size, parent_pool, elites, simulat
     return best_solution, best_fitness, fitness_history
 
 if __name__ == '__main__':
-    _,_, fitness_history = run_simulation( num_generation=1000,
-                population_size=200,
-                parent_pool=50,
-                elites=15,
-                simulation_duration=10,
-                action_resolution=0.5,
+    _,_, fitness_history = run_simulation( num_generation=5000,
+                population_size=50,
+                parent_pool=25,
+                elites=5,
+                simulation_duration=15,
+                action_resolution=0.15,
                 print_output=False)
     
     # Plotting the fitness history
