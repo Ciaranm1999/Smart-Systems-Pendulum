@@ -139,12 +139,25 @@ class InvertedPendulumGA:
         return [self.population[i] for i in top_performers_original_indices]
 
     def crossover(self, parent1, parent2):
-        crossover_points = sorted(random.sample(range(1, self.num_steps), 2))
-        offspring = np.concatenate([
-            parent1[:crossover_points[0]],
-            parent2[crossover_points[0]:crossover_points[1]],
-            parent1[crossover_points[1]:]
-        ])
+        critical_segment_length = self.critical_segment_length
+
+        # Preserve the first segment (encourage large movements)
+        if np.sum(np.abs(parent1[:critical_segment_length])) > np.sum(np.abs(parent2[:critical_segment_length])):
+            start_segment = parent1[:critical_segment_length]
+        else:
+            start_segment = parent2[:critical_segment_length]
+
+        # Preserve the last segment (encourage stabilization)
+        if np.var(parent1[-critical_segment_length:]) < np.var(parent2[-critical_segment_length:]):
+            end_segment = parent1[-critical_segment_length:]
+        else:
+            end_segment = parent2[-critical_segment_length:]
+
+        # Exchange the middle segment
+        middle_segment = parent2[critical_segment_length:-critical_segment_length]
+
+        # Combine the segments to form the offspring
+        offspring = np.concatenate([start_segment, middle_segment, end_segment])
         return offspring
 
     def mutate(self, individual, mutation_rate=0.3):
