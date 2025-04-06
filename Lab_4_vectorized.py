@@ -3,7 +3,7 @@ import numpy as np
 import random
 import time
 import multiprocessing
-from Digital_twin_simplified import DigitalTwin
+from Digital_twin import DigitalTwin
 from hyperparameters import hyperparameters
 import os
 import matplotlib.pyplot as plt
