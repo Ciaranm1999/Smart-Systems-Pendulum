@@ -14,7 +14,7 @@ if __name__=='__main__':
         # Each action is performed after 200ms so that the actions do not overlap in time.
         # Can also use your keyboard to manually control the system.
 
-        actions = list(np.load("./best_actions_20k.npy"))
+        actions = list(np.load("./best_action-20k.npy"))
 
         test = 0.15
         steps_time = test / digital_twin.delta_t
