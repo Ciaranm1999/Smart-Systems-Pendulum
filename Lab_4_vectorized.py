@@ -40,10 +40,62 @@ def worker_simulate(args):
              return -100 # Use a distinct failure value if needed
     return max_score
 
+def fitness_function(individual, dt_config):
+    """
+    Fitness function to reward balancing within [3π/4, 5π/4] for a long time,
+    discourage oscillations, and reward proximity to π.
+    """
+    digital_twin = DigitalTwin()  # Create a new DigitalTwin instance
+    digital_twin.theta = 0.0
+    digital_twin.theta_dot = 0.0
+    digital_twin.x_pivot = 0.0
+
+    simulation_steps = dt_config['simulation_steps']
+    step_resolution = dt_config['step_resolution']
+    action_map = dt_config['action_map']
+
+    total_reward = 0
+    in_target_range_steps = 0
+    consecutive_steps_in_range = 0
+
+    for step in range(simulation_steps):
+        if step % step_resolution == 0 and step // step_resolution < len(individual):
+            action_index = individual[step // step_resolution]
+            direction, duration = action_map[action_index]
+            digital_twin.perform_action(direction, duration)
+
+        theta, theta_dot, x_pivot = digital_twin.step()
+
+        # Reward for being within [3π/4, 5π/4]
+        if (3 * np.pi / 4) <= theta <= (5 * np.pi / 4):
+            in_target_range_steps += 1
+            consecutive_steps_in_range += 1
+            # Exponential reward for consecutive steps in range
+            total_reward += 50 * (1.2 ** consecutive_steps_in_range)  # Exponential growth
+        else:
+            total_reward -= 20  # Penalty for leaving the range
+            consecutive_steps_in_range = 0  # Reset consecutive steps
+
+        # Penalize large angular velocity (discourage oscillations)
+        total_reward -= abs(theta_dot) * 10
+
+        # Additional reward for being close to π (only if in the range)
+        if (3 * np.pi / 4) <= theta <= (5 * np.pi / 4) and abs(theta - np.pi) < 0.1:
+            total_reward += 20  # Larger reward for proximity to π
+
+        # Penalize if the pendulum falls or x_pivot exceeds bounds
+        if abs(x_pivot) > 0.135:
+            return -500  # Larger failure penalty
+
+    # Add a bonus for staying in the target range for a long time
+    total_reward += in_target_range_steps * 25  # Bonus for long-term stability
+
+    return total_reward
+
 class InvertedPendulumGA:
-    def __init__(self, population_size, num_actions, simulation_duration, action_resolution, simulation_delta_t, parent_pool_size=50, elite_size=15, print_output=True):
+    def __init__(self, population_size, num_actions, simulation_duration, action_resolution, simulation_delta_t, 
+                 parent_pool_size=50, elite_size=15, print_output=True, critical_segment_length=40):
         self.action_resolution = simulation_duration / (num_actions + 1)
-        # self.digital_twin = DigitalTwin()
         self.population_size = population_size
         self.parent_pool_size = parent_pool_size
         self.elite_size = elite_size
@@ -56,18 +108,15 @@ class InvertedPendulumGA:
         self.num_steps = int(simulation_duration / action_resolution)
         self.step_resolution = int(action_resolution / simulation_delta_t)
         self.print_output = print_output
-        self.critical_segment_length = 40  # Add this parameter
+        self.critical_segment_length = 25  # Add this parameter
         temp_dt = DigitalTwin()  # Create temporarily to get action_map
         self.dt_config = {
             'simulation_steps': self.simulation_steps,
             'step_resolution': self.step_resolution,
-            'action_map': temp_dt.action_map, # Pass the action map
-            # Add any other parameters DigitalTwin or simulate needs
+            'action_map': temp_dt.action_map,  # Pass the action map
         }
-        del temp_dt # Don't keep the instance
+        del temp_dt  # Don't keep the instance
         self.population = [self.create_individual() for _ in range(population_size)]
-        # fitness_scores = self.evaluate_population()
-        # print(fitness_scores, "at start")
 
     def create_individual(self):
 
@@ -93,7 +142,7 @@ class InvertedPendulumGA:
             elif net_movement >= hp.TRACK_LENGTH:
                action = np.random.choice([1, 2, 3, 4]) # Example action indices
             else: # net_movement <= -100
-               action = np.random.choice([5, 6, 7, 8]) # Example action indices
+               action = np.random.choice([0, 5, 6, 7, 8]) # Example action indices
 
             actions[i] = action
             if action in action_map:
@@ -113,30 +162,13 @@ class InvertedPendulumGA:
         fitness_scores = pool.map(worker_simulate, args_list)
         return fitness_scores
 
-    def select_parents(self, fitness_scores):
-        # Ensure fitness_scores and self.population align correctly
-        valid_indices = [i for i, score in enumerate(fitness_scores) if score != -100] # Example: ignore failures
-        valid_scores = [fitness_scores[i] for i in valid_indices]
-        valid_population = [self.population[i] for i in valid_indices]
-
-        if not valid_scores: # Handle case where all simulations failed
-            if self.print_output:
-                print("Warning: All individuals failed simulation.")
-            # Fallback: maybe select randomly or return empty list?
-            # For now, just selecting from the original population randomly might be a fallback
-            indices = np.random.choice(len(self.population), self.parent_pool_size, replace=False)
-            return [self.population[i] for i in indices]
-
-
-        # Select from valid individuals
-        pool_size = min(self.parent_pool_size, len(valid_scores))
-        # Argsort sorts ascending, so smallest scores (best fitness) are first
-        sorted_indices_in_valid = np.argsort(valid_scores)
-        # Select the indices corresponding to the best scores within the valid subset
-        top_performers_original_indices = [valid_indices[i] for i in sorted_indices_in_valid[:pool_size]]
-
-        # Return the actual individuals from the original population
-        return [self.population[i] for i in top_performers_original_indices]
+    def select_parents(self, fitness_scores, tournament_size=5):
+        selected_parents = []
+        for _ in range(self.parent_pool_size):
+            tournament_indices = np.random.choice(len(fitness_scores), tournament_size, replace=False)
+            best_index = max(tournament_indices, key=lambda i: fitness_scores[i])
+            selected_parents.append(self.population[best_index])
+        return selected_parents
 
     def crossover(self, parent1, parent2):
         critical_segment_length = self.critical_segment_length
@@ -161,11 +193,15 @@ class InvertedPendulumGA:
         return offspring
 
     def mutate(self, individual, mutation_rate=0.3):
+        """
+        Mutates an individual with a fixed mutation rate.
+        """
+        # Generate a mask to determine which genes to mutate
         mask = np.random.rand(self.num_steps) < mutation_rate
-         # Ensure mutation generates valid action indices (e.g., 1 to num_actions-1)
         num_mutations = np.sum(mask)
         if num_mutations > 0:
-             individual[mask] = np.random.randint(1, self.num_actions, size=num_mutations)
+            # Apply mutations to the selected genes
+            individual[mask] = np.random.randint(1, self.num_actions, size=num_mutations)
         return individual
 
     def run_generation(self, pool, num_elites=15, steps=500, fitness_scores=None):
@@ -286,7 +322,7 @@ class InvertedPendulumGA:
                     fitness_history.append([current_best_fitness, i])
             if self.print_output:
                 print(f"Optimization finished. Best fitness after {num_generations} generations is {best_overall_fitness}.")
-            return best_overall_solution, current_best_fitness, fitness_history # Return the best solution found across all generations
+            return best_overall_solution, best_overall_fitness, fitness_history # Return the best solution found across all generations
 
     # inject_elite needs adaptation if evaluate_population now requires a pool
     def inject_elite(self, elite, pool): # Requires pool
@@ -327,12 +363,12 @@ def run_simulation(num_generation, population_size, parent_pool, elites, simulat
     return best_solution, best_fitness, fitness_history
 
 if __name__ == '__main__':
-    _,_, fitness_history = run_simulation( num_generation=1000,
-                population_size=200,
+    _,_, fitness_history = run_simulation( num_generation=1500,
+                population_size=100,
                 parent_pool=50,
-                elites=15,
-                simulation_duration=10,
-                action_resolution=0.5,
+                elites=10,
+                simulation_duration=15,
+                action_resolution=0.1,
                 print_output=False)
     
     # Plotting the fitness history
