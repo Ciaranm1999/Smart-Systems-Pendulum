@@ -57,7 +57,7 @@ class DataFilter:
         return ((np.array(data) - self.sensor_min) * (np.pi / self.sensor_range)) - (0.5 * np.pi) - self.offset_radians
 
 
-    def apply_filters(self, sampling_rate=40.0, apply_low_pass=True):
+    def apply_filters(self, sampling_rate=40.0, apply_butterworth=True):
         buffer = np.zeros(self.kernel_size)
         ema_val = self.data[0]
 
@@ -82,8 +82,8 @@ class DataFilter:
             self.median.append(med)
             self.kalman_filtered.append(kalman_val)
 
-        # --- Low-pass filter using FFT (after full signal is available) ---
-        if apply_low_pass:
+        # --- Low-pass Butterworth filter using FFT ---
+        if apply_butterworth:
             signal = np.array(self.data)
             n = len(signal)
             timestep = 1 / sampling_rate
@@ -111,7 +111,7 @@ class DataFilter:
             filtered_signal += mean_val
 
             self.low_pass_filtered = filtered_signal
-            print(f"Low-pass filter applied. Dominant frequency: {dominant_freq:.2f} Hz, Cutoff: {cutoff_freq:.2f} Hz")
+            print(f"Low-pass Butterworth filter applied. Dominant frequency: {dominant_freq:.2f} Hz, Cutoff: {cutoff_freq:.2f} Hz")
 
     
     def save_filtered_data(self, output_path="filtered_output.csv", in_radians=False):
@@ -122,7 +122,7 @@ class DataFilter:
                 "ema": self.to_radians(self.ema),
                 "median": self.to_radians(self.median),
                 "kalman": self.to_radians(self.kalman_filtered),
-                "low_pass": self.to_radians(self.low_pass_filtered)
+                "butterworth": self.to_radians(self.low_pass_filtered)
             }
         else:
             data_to_save = {
@@ -131,7 +131,7 @@ class DataFilter:
                 "ema": self.ema,
                 "median": self.median,
                 "kalman": self.kalman_filtered,
-                "low_pass": self.low_pass_filtered
+                "butterworth": self.low_pass_filtered
             }
 
         df_filtered = pd.DataFrame(data_to_save)
@@ -140,7 +140,7 @@ class DataFilter:
 
 
 
-    def plot(self, filters_to_plot=["original", "ema", "median", "kalman","low_pass"], range_to_plot=None):
+    def plot(self, filters_to_plot=["original", "ema", "median", "kalman","butter"], range_to_plot=None):
         # Dictionary to map names to the actual data
         filter_data = {
             key: val for key, val in {
@@ -148,7 +148,7 @@ class DataFilter:
                 "ema": self.ema,
                 "median": self.median,
                 "kalman": self.kalman_filtered,
-                "low_pass": self.low_pass_filtered
+                "butterworth": self.low_pass_filtered
             }.items()
         }
 
@@ -158,7 +158,7 @@ class DataFilter:
             "ema": {"label": "EMA", "style": "--"},
             "median": {"label": "Median", "style": "-."},
             "kalman": {"label": "Kalman", "style": "-."},
-            "low_pass": {"label": "Low-Pass", "style": "-."}
+            "butterworth": {"label": "Low-Pass", "style": "-."}
         }
 
         # Determine range
@@ -190,21 +190,21 @@ class DataFilter:
 
 if __name__ == "__main__":
 
-    df_sim = pd.read_csv("theta_history.csv")
-    theta_history = df_sim['Theta'].values[:1235]
+    # df_sim = pd.read_csv("theta_history.csv")
+    # theta_history = df_sim['Theta'].values[:1235]
 
  # Test data
     df_test = DataFilter("data_points_free_fall_40Hz.csv", column_name="xAccl", alpha=0.4, kernel_size=11,
                 kalman_process_var=1e-5, kalman_measurement_var=1e-4) 
     df_test.load_data(start=0, end=1500) # CHANGE START TO 265 TO MATCH THE SIMULATED DATA
 
-    df_test.apply_filters(apply_low_pass=True)
+    df_test.apply_filters(apply_butterworth=True)
 
-    df_test.plot(filters_to_plot=["original","low_pass"]) 
-    df_test.plot(filters_to_plot=["original", "kalman"])
-    df_test.plot(filters_to_plot=["original", "ema"])
-    df_test.plot(filters_to_plot=["original", "median"])  
-    df_test.plot(filters_to_plot=["original", "ema", "median", "kalman","low_pass"], range_to_plot=(130, 400)) 
+    df_test.plot(filters_to_plot=["original","butterworth"], range_to_plot=(200,400)) 
+    df_test.plot(filters_to_plot=["original", "kalman"], range_to_plot=(200,400))
+    df_test.plot(filters_to_plot=["original", "ema"],   range_to_plot=(200,400))
+    df_test.plot(filters_to_plot=["original", "median"], range_to_plot=(200,400))  
+    df_test.plot(filters_to_plot=["original", "ema", "median", "kalman","butterworth"], range_to_plot=(130, 400)) 
 
 
     df_test.save_filtered_data("filtered_data.csv", in_radians=False)
